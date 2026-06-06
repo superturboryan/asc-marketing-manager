@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  assertEditableForChanges,
   buildAppInfoDiff,
   buildAppStoreVersionCreatePayload,
   buildAppStoreVersionPatchPayload,
@@ -16,7 +17,6 @@ import {
   buildVersionAttributeDiff,
   buildVersionLocalizationDiff,
   expandFallbackLocales,
-  assertEditableForChanges,
   loadAscState,
   normalizeAscText,
   parseDesiredMetadata,
@@ -34,202 +34,289 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, 'fixtures');
 
-test('parseEnvFile reads values and validateEnv treats ASC_VERSION as optional', () => {
-  const env = parseEnvFile(`
+const fixturePath = (name) => path.join(fixturesDir, name);
+const readFixture = (name) => fs.readFileSync(fixturePath(name), 'utf8');
+const readJsonFixture = (name) => JSON.parse(readFixture(name));
+const parseDesiredFixture = () => parseDesiredMetadata(readFixture('desired-valid.json'));
+const parseDesiredObject = (desired) => parseDesiredMetadata(JSON.stringify(desired));
+
+const validNestedDesired = () => ({
+  appInfo: {
+    locales: {
+      'en-US': {
+        name: 'WatchCloud',
+        subtitle: 'Music on your watch',
+      },
+    },
+  },
+  version: {
+    versionString: '2.3.0',
+    platform: 'IOS',
+    copyright: '2026 Example',
+    releaseType: 'AFTER_APPROVAL',
+    usesIdfa: false,
+    locales: {
+      'en-US': {
+        promotionalText: 'Listen from your wrist.',
+        description: 'A focused SoundCloud player for watchOS.',
+        keywords: 'soundcloud,watch,music',
+        supportUrl: 'https://example.com/support',
+        marketingUrl: 'https://example.com',
+        whatsNew: '+ Bug fixes',
+      },
+    },
+  },
+  review: {
+    contactFirstName: 'Ada',
+    contactLastName: 'Lovelace',
+    contactPhone: '+15555550123',
+    contactEmail: 'ada@example.com',
+    demoAccountRequired: true,
+    demoAccountName: 'demo@example.com',
+    demoAccountPassword: 'secret-password',
+    notes: 'Use the demo account.',
+  },
+});
+
+const matchingAscRoute = (apiPath, response) => ({
+  matches: (candidatePath) => candidatePath === apiPath,
+  response,
+});
+
+const ascRoutes = (routes) => {
+  const calls = [];
+  const request = async (method, apiPath) => {
+    calls.push([method, apiPath]);
+    const route = routes.find(({ matches }) => matches(apiPath));
+    if (!route) throw new Error(`Unexpected call ${apiPath}`);
+    return typeof route.response === 'function' ? route.response() : route.response;
+  };
+
+  return { calls, request };
+};
+
+test('given an env file without ASC_VERSION, when parsing and validating it, then ASC_VERSION is optional', () => {
+  // Given
+  const envFileContents = `
 ASC_KEY_ID=ABCD1234EF
 ASC_ISSUER_ID=issuer-id
 ASC_KEY_PATH=/tmp/AuthKey_ABCD1234EF.p8
 ASC_APP_ID=1234567890
-`);
+`;
 
+  // When
+  const env = parseEnvFile(envFileContents);
+  const validateWithoutVersion = () => validateEnv(env, { checkKeyFile: false });
+  const validateMissingRequiredValues = () => validateEnv({ ASC_KEY_ID: 'secret' }, { checkKeyFile: false });
+
+  // Then
   assert.equal(env.ASC_KEY_ID, 'ABCD1234EF');
   assert.equal(redactValue(env.ASC_KEY_ID), 'AB…EF');
-  assert.doesNotThrow(() => validateEnv(env, { checkKeyFile: false }));
-  assert.throws(() => validateEnv({ ASC_KEY_ID: 'secret' }, { checkKeyFile: false }), /Missing env values/);
+  assert.doesNotThrow(validateWithoutVersion);
+  assert.throws(validateMissingRequiredValues, /Missing env values/);
 });
 
-test('parseDesiredMetadata validates legacy locales and expands version fallbacks', () => {
-  const desired = parseDesiredMetadata(fs.readFileSync(path.join(fixturesDir, 'desired-valid.json'), 'utf8'));
+test('given legacy desired metadata with locale fallbacks, when parsing and expanding version locales, then fallback locales copy source locale text', () => {
+  // Given
+  const desired = parseDesiredFixture();
+
+  // When
   const expanded = expandFallbackLocales(desired.version);
 
+  // Then
   assert.deepEqual(desired.appInfo.locales, {});
   assert.equal(expanded['en-GB'].promotionalText, desired.version.locales['en-US'].promotionalText);
   assert.equal(expanded['es-MX'].whatsNew, desired.version.locales['es-ES'].whatsNew);
-  assert.equal(Object.keys(expanded).length, 5);
+  assert.deepEqual(Object.keys(expanded).sort(), ['en-GB', 'en-US', 'es-ES', 'es-MX', 'ja']);
 });
 
-test('parseDesiredMetadata validates nested appInfo, version, and review shape', () => {
-  const desired = parseDesiredMetadata(JSON.stringify({
-    appInfo: {
-      locales: {
-        'en-US': {
-          name: 'WatchCloud',
-          subtitle: 'Music on your watch',
-        },
-      },
-    },
-    version: {
-      versionString: '2.3.0',
-      platform: 'IOS',
-      copyright: '2026 Example',
-      releaseType: 'AFTER_APPROVAL',
-      usesIdfa: false,
-      locales: {
-        'en-US': {
-          promotionalText: 'Listen from your wrist.',
-          description: 'A focused SoundCloud player for watchOS.',
-          keywords: 'soundcloud,watch,music',
-          supportUrl: 'https://example.com/support',
-          marketingUrl: 'https://example.com',
-          whatsNew: '+ Bug fixes',
-        },
-      },
-    },
-    review: {
-      contactFirstName: 'Ada',
-      contactLastName: 'Lovelace',
-      contactPhone: '+15555550123',
-      contactEmail: 'ada@example.com',
-      demoAccountRequired: true,
-      demoAccountName: 'demo@example.com',
-      demoAccountPassword: 'secret-password',
-      notes: 'Use the demo account.',
-    },
-  }));
+test('given nested desired metadata, when parsing it, then app info, version, and review fields are preserved', () => {
+  // Given
+  const desiredJson = validNestedDesired();
 
+  // When
+  const desired = parseDesiredObject(desiredJson);
+
+  // Then
   assert.equal(desired.appInfo.locales['en-US'].name, 'WatchCloud');
   assert.equal(desired.version.versionString, '2.3.0');
   assert.equal(desired.review.demoAccountRequired, true);
 });
 
-test('validateDesiredMetadata rejects invalid fallback, blank fields, and mixed shapes', () => {
-  assert.throws(() => validateDesiredMetadata({
-    version: {
-      locales: {
-        'en-US': { promotionalText: 'Valid' },
+test('given invalid desired metadata shapes, when validating them, then each shape fails with the expected error', () => {
+  const scenarios = [
+    {
+      name: 'fallback to a missing source locale',
+      given: {
+        version: {
+          locales: {
+            'en-US': { promotionalText: 'Valid' },
+          },
+          fallbacks: {
+            'en-GB': 'fr-FR',
+          },
+        },
       },
-      fallbacks: {
-        'en-GB': 'fr-FR',
-      },
+      then: /missing source locale/,
     },
-  }), /missing source locale/);
+    {
+      name: 'blank locale fields',
+      given: {
+        version: {
+          locales: {
+            'en-US': { promotionalText: ' ' },
+          },
+        },
+      },
+      then: /blank/,
+    },
+    {
+      name: 'mixed legacy and nested shape',
+      given: {
+        locales: {
+          'en-US': { promotionalText: 'Valid', whatsNew: 'Valid' },
+        },
+        version: {},
+      },
+      then: /legacy top-level locales/,
+    },
+  ];
 
-  assert.throws(() => validateDesiredMetadata({
-    version: {
-      locales: {
-        'en-US': { promotionalText: ' ' },
-      },
-    },
-  }), /blank/);
+  for (const scenario of scenarios) {
+    // Given
+    const desired = scenario.given;
 
-  assert.throws(() => validateDesiredMetadata({
-    locales: {
-      'en-US': { promotionalText: 'Valid', whatsNew: 'Valid' },
-    },
-    version: {},
-  }), /legacy top-level locales/);
+    // When
+    const validate = () => validateDesiredMetadata(desired);
+
+    // Then
+    assert.throws(validate, scenario.then, scenario.name);
+  }
 });
 
-test('field limits cover chars, bytes, and URLs', () => {
-  assert.equal(unicodeLength('手首のウォッチ'), 7);
-  assert.equal(utf8ByteLength('é'), 2);
+test('given Unicode text, when counting characters and bytes, then character count and UTF-8 byte count are distinct', () => {
+  // Given
+  const japaneseText = '手首のウォッチ';
+  const accentedCharacter = 'é';
 
-  assert.throws(() => validateDesiredMetadata({
-    appInfo: {
-      locales: {
-        'en-US': { name: 'x' },
-      },
-    },
-  }), /minimum characters/);
+  // When
+  const characterCount = unicodeLength(japaneseText);
+  const byteCount = utf8ByteLength(accentedCharacter);
 
-  assert.throws(() => validateDesiredMetadata({
-    appInfo: {
-      locales: {
-        'en-US': { subtitle: 'x'.repeat(31) },
-      },
-    },
-  }), /31\/30/);
-
-  assert.throws(() => validateDesiredMetadata({
-    version: {
-      locales: {
-        'en-US': { promotionalText: 'x'.repeat(171) },
-      },
-    },
-  }), /171\/170/);
-
-  assert.throws(() => validateDesiredMetadata({
-    version: {
-      locales: {
-        'en-US': { description: 'x'.repeat(4001) },
-      },
-    },
-  }), /4001\/4000/);
-
-  assert.throws(() => validateDesiredMetadata({
-    version: {
-      locales: {
-        'en-US': { keywords: 'é'.repeat(51) },
-      },
-    },
-  }), /102\/100 UTF-8 bytes/);
-
-  assert.throws(() => validateDesiredMetadata({
-    version: {
-      locales: {
-        'en-US': { supportUrl: 'example.com/support' },
-      },
-    },
-  }), /valid URL/);
-
-  assert.throws(() => validateDesiredMetadata({
-    review: {
-      notes: 'é'.repeat(2001),
-    },
-  }), /4002\/4000 UTF-8 bytes/);
+  // Then
+  assert.equal(characterCount, 7);
+  assert.equal(byteCount, 2);
 });
 
-test('normalizeAscText removes trailing whitespace for ASC verification', () => {
-  assert.equal(normalizeAscText('hello\n'), 'hello');
-  assert.equal(normalizeAscText('hello  \n\t'), 'hello');
+test('given desired metadata that exceeds field limits or has a bad URL, when validating it, then the matching limit error is raised', () => {
+  const scenarios = [
+    {
+      name: 'name minimum length',
+      given: { appInfo: { locales: { 'en-US': { name: 'x' } } } },
+      then: /minimum characters/,
+    },
+    {
+      name: 'subtitle maximum length',
+      given: { appInfo: { locales: { 'en-US': { subtitle: 'x'.repeat(31) } } } },
+      then: /31\/30/,
+    },
+    {
+      name: 'promotional text maximum length',
+      given: { version: { locales: { 'en-US': { promotionalText: 'x'.repeat(171) } } } },
+      then: /171\/170/,
+    },
+    {
+      name: 'description maximum length',
+      given: { version: { locales: { 'en-US': { description: 'x'.repeat(4001) } } } },
+      then: /4001\/4000/,
+    },
+    {
+      name: 'keywords byte limit',
+      given: { version: { locales: { 'en-US': { keywords: 'é'.repeat(51) } } } },
+      then: /102\/100 UTF-8 bytes/,
+    },
+    {
+      name: 'URL protocol requirement',
+      given: { version: { locales: { 'en-US': { supportUrl: 'example.com/support' } } } },
+      then: /valid URL/,
+    },
+    {
+      name: 'review notes byte limit',
+      given: { review: { notes: 'é'.repeat(2001) } },
+      then: /4002\/4000 UTF-8 bytes/,
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    // Given
+    const desired = scenario.given;
+
+    // When
+    const validate = () => validateDesiredMetadata(desired);
+
+    // Then
+    assert.throws(validate, scenario.then, scenario.name);
+  }
 });
 
-test('buildVersionLocalizationDiff detects unchanged, changed, and created locales', () => {
-  const desired = parseDesiredMetadata(fs.readFileSync(path.join(fixturesDir, 'desired-valid.json'), 'utf8'));
-  const desiredLocales = expandFallbackLocales(desired.version);
-  const response = JSON.parse(fs.readFileSync(path.join(fixturesDir, 'app-store-version-localizations.json'), 'utf8'));
-  const diff = buildVersionLocalizationDiff(response.data, {
-    ...desiredLocales,
+test('given ASC text with trailing whitespace, when normalizing it, then trailing whitespace is removed', () => {
+  // Given
+  const textWithNewline = 'hello\n';
+  const textWithMixedTrailingWhitespace = 'hello  \n\t';
+
+  // When
+  const normalizedNewlineText = normalizeAscText(textWithNewline);
+  const normalizedMixedWhitespaceText = normalizeAscText(textWithMixedTrailingWhitespace);
+
+  // Then
+  assert.equal(normalizedNewlineText, 'hello');
+  assert.equal(normalizedMixedWhitespaceText, 'hello');
+});
+
+test('given existing and desired version localizations, when building the diff, then unchanged, update, and create actions are reported', () => {
+  // Given
+  const desired = parseDesiredFixture();
+  const desiredLocales = {
+    ...expandFallbackLocales(desired.version),
     'fr-FR': {
       promotionalText: 'Ecoutez sur votre montre.',
       whatsNew: '+ Correctifs',
     },
-  });
+  };
+  const existingLocalizations = readJsonFixture('app-store-version-localizations.json').data;
 
-  const enUS = diff.find((change) => change.locale === 'en-US');
-  const enGB = diff.find((change) => change.locale === 'en-GB');
-  const frFR = diff.find((change) => change.locale === 'fr-FR');
-  assert.equal(enUS.changed, false);
-  assert.equal(enGB.action, 'update');
-  assert.deepEqual(Object.keys(enGB.fields).sort(), ['promotionalText', 'whatsNew']);
-  assert.equal(frFR.action, 'create');
+  // When
+  const diff = buildVersionLocalizationDiff(existingLocalizations, desiredLocales);
+  const byLocale = Object.fromEntries(diff.map((change) => [change.locale, change]));
+
+  // Then
+  assert.equal(byLocale['en-US'].changed, false);
+  assert.equal(byLocale['en-GB'].action, 'update');
+  assert.deepEqual(Object.keys(byLocale['en-GB'].fields).sort(), ['promotionalText', 'whatsNew']);
+  assert.equal(byLocale['fr-FR'].action, 'create');
   assert.match(summarizeDiff(diff), /fr-FR: CREATE/);
 });
 
-test('buildDiff remains a version-localization compatibility alias', () => {
-  const response = JSON.parse(fs.readFileSync(path.join(fixturesDir, 'app-store-version-localizations.json'), 'utf8'));
-  const diff = buildDiff(response.data, {
+test('given callers use the legacy buildDiff alias, when building a localization diff, then version localization resources are returned', () => {
+  // Given
+  const existingLocalizations = readJsonFixture('app-store-version-localizations.json').data;
+  const desiredLocales = {
     'en-US': {
       promotionalText: 'Different',
       whatsNew: '+ New',
     },
-  });
+  };
 
+  // When
+  const diff = buildDiff(existingLocalizations, desiredLocales);
+
+  // Then
   assert.equal(diff[0].resourceType, 'appStoreVersionLocalizations');
 });
 
-test('buildAppInfoDiff handles app-level name and subtitle fields', () => {
-  const diff = buildAppInfoDiff([
+test('given app info localizations with one changed locale and one new locale, when building the diff, then update and create actions are returned', () => {
+  // Given
+  const existingLocalizations = [
     {
       type: 'appInfoLocalizations',
       id: 'app-info-en-us',
@@ -239,7 +326,8 @@ test('buildAppInfoDiff handles app-level name and subtitle fields', () => {
         subtitle: 'Old subtitle',
       },
     },
-  ], {
+  ];
+  const desiredLocales = {
     'en-US': {
       name: 'WatchCloud',
       subtitle: 'Music on your watch',
@@ -248,23 +336,43 @@ test('buildAppInfoDiff handles app-level name and subtitle fields', () => {
       name: 'WatchCloud',
       subtitle: 'Musica en tu reloj',
     },
-  });
+  };
 
+  // When
+  const diff = buildAppInfoDiff(existingLocalizations, desiredLocales);
+
+  // Then
   assert.equal(diff[0].action, 'update');
   assert.deepEqual(diff[0].fields, { subtitle: 'Music on your watch' });
   assert.equal(diff[1].action, 'create');
 });
 
-test('payload builders create ASC JSON:API shapes', () => {
-  const patchPayload = buildPatchPayload({
+test('given localization update and create changes, when building payloads, then ASC JSON:API fields and relationships are included', () => {
+  // Given
+  const updateChange = {
     id: 'loc-123',
     resourceType: 'appStoreVersionLocalizations',
     fields: {
       promotionalText: 'New promo',
       whatsNew: '+ New notes',
     },
-  });
+  };
+  const createChange = {
+    locale: 'fr-FR',
+    resourceType: 'appStoreVersionLocalizations',
+    createRelationshipName: 'appStoreVersion',
+    createRelationshipType: 'appStoreVersions',
+    desired: {
+      promotionalText: 'Bonjour',
+      whatsNew: '+ Notes',
+    },
+  };
 
+  // When
+  const patchPayload = buildPatchPayload(updateChange);
+  const createPayload = buildLocalizationCreatePayload(createChange, 'version-123');
+
+  // Then
   assert.deepEqual(patchPayload, {
     data: {
       type: 'appStoreVersionLocalizations',
@@ -275,50 +383,53 @@ test('payload builders create ASC JSON:API shapes', () => {
       },
     },
   });
-
-  const createPayload = buildLocalizationCreatePayload({
-    locale: 'fr-FR',
-    resourceType: 'appStoreVersionLocalizations',
-    createRelationshipName: 'appStoreVersion',
-    createRelationshipType: 'appStoreVersions',
-    desired: {
-      promotionalText: 'Bonjour',
-      whatsNew: '+ Notes',
-    },
-  }, 'version-123');
-
   assert.equal(createPayload.data.attributes.locale, 'fr-FR');
   assert.equal(createPayload.data.relationships.appStoreVersion.data.id, 'version-123');
 });
 
-test('version create and patch payloads use defaults and omit platform from patch', () => {
-  const createPayload = buildAppStoreVersionCreatePayload({
+test('given a version create request without optional attributes, when building the payload, then default ASC values are used', () => {
+  // Given
+  const env = {
     ASC_APP_ID: '1234567890',
     ASC_COPYRIGHT: '2026 Example',
-  }, {
+  };
+  const desiredVersion = {
     versionString: '2.3.0',
-  }, '2.3.0');
+  };
 
-  assert.deepEqual(createPayload.data.attributes, {
+  // When
+  const payload = buildAppStoreVersionCreatePayload(env, desiredVersion, '2.3.0');
+
+  // Then
+  assert.deepEqual(payload.data.attributes, {
     platform: 'IOS',
     versionString: '2.3.0',
     copyright: '2026 Example',
     releaseType: 'MANUAL',
     usesIdfa: false,
   });
+});
 
-  const patchPayload = buildAppStoreVersionPatchPayload('version-123', {
+test('given changed version fields include platform, when building the patch payload, then platform is omitted', () => {
+  // Given
+  const versionId = 'version-123';
+  const changedFields = {
     platform: 'IOS',
     releaseType: 'AFTER_APPROVAL',
-  });
+  };
 
-  assert.deepEqual(patchPayload.data.attributes, {
+  // When
+  const payload = buildAppStoreVersionPatchPayload(versionId, changedFields);
+
+  // Then
+  assert.deepEqual(payload.data.attributes, {
     releaseType: 'AFTER_APPROVAL',
   });
 });
 
-test('review detail diff and summaries redact password fields', () => {
-  const diff = buildReviewDetailDiff({
+test('given review detail changes include a password, when diffing and summarizing them, then summaries redact the password', () => {
+  // Given
+  const currentReviewDetail = {
     type: 'appStoreReviewDetails',
     id: 'review-123',
     attributes: {
@@ -326,57 +437,83 @@ test('review detail diff and summaries redact password fields', () => {
       demoAccountRequired: false,
       demoAccountPassword: 'old-secret',
     },
-  }, {
+  };
+  const desiredReviewDetail = {
     contactFirstName: 'Ada',
     demoAccountRequired: true,
     demoAccountPassword: 'new-secret',
     notes: 'Use sign in.',
-  });
+  };
 
+  // When
+  const diff = buildReviewDetailDiff(currentReviewDetail, desiredReviewDetail);
+  const summary = summarizeReviewDiff(diff);
+  const payload = buildReviewDetailPayload(diff, 'version-123');
+
+  // Then
   assert.equal(diff.action, 'update');
   assert.equal(diff.fields.demoAccountPassword, 'new-secret');
-  assert.match(summarizeReviewDiff(diff), /demoAccountPassword=<redacted>/);
-  assert.doesNotMatch(summarizeReviewDiff(diff), /new-secret/);
-
-  const payload = buildReviewDetailPayload(diff, 'version-123');
+  assert.match(summary, /demoAccountPassword=<redacted>/);
+  assert.doesNotMatch(summary, /new-secret/);
   assert.equal(payload.data.id, 'review-123');
   assert.equal(payload.data.attributes.demoAccountPassword, 'new-secret');
 });
 
-test('resolveVersionString precedence is args, desired, then env', () => {
-  assert.equal(resolveVersionString({ version: '3.0' }, { ASC_VERSION: '1.0' }, { version: { versionString: '2.0' } }), '3.0');
-  assert.equal(resolveVersionString({}, { ASC_VERSION: '1.0' }, { version: { versionString: '2.0' } }), '2.0');
-  assert.equal(resolveVersionString({}, { ASC_VERSION: '1.0' }, { version: {} }), '1.0');
-  assert.throws(() => resolveVersionString({}, {}, { version: {} }), /Missing version string/);
+test('given args, desired metadata, and env all contain version values, when resolving the version string, then args win before desired and env', () => {
+  // Given
+  const env = { ASC_VERSION: '1.0' };
+  const desired = { version: { versionString: '2.0' } };
+  const desiredWithoutVersion = { version: {} };
+
+  // When
+  const versionFromArgs = resolveVersionString({ version: '3.0' }, env, desired);
+  const versionFromDesired = resolveVersionString({}, env, desired);
+  const versionFromEnv = resolveVersionString({}, env, desiredWithoutVersion);
+  const resolveMissingVersion = () => resolveVersionString({}, {}, desiredWithoutVersion);
+
+  // Then
+  assert.equal(versionFromArgs, '3.0');
+  assert.equal(versionFromDesired, '2.0');
+  assert.equal(versionFromEnv, '1.0');
+  assert.throws(resolveMissingVersion, /Missing version string/);
 });
 
-test('buildVersionAttributeDiff models missing and existing ASC versions', () => {
-  const createDiff = buildVersionAttributeDiff(null, {
+test('given missing and existing ASC versions, when building version attribute diffs, then create and update changes are modeled', () => {
+  // Given
+  const desiredVersionForCreate = {
     versionString: '2.3.0',
     copyright: '2026 Example',
-  }, '2.3.0');
-  assert.equal(createDiff.action, 'create');
-
-  const updateDiff = buildVersionAttributeDiff({
+  };
+  const existingVersion = {
     id: 'version-123',
     attributes: {
       versionString: '2.3.0',
       releaseType: 'MANUAL',
     },
-  }, {
+  };
+  const desiredVersionUpdate = {
     releaseType: 'AFTER_APPROVAL',
-  }, '2.3.0');
+  };
+
+  // When
+  const createDiff = buildVersionAttributeDiff(null, desiredVersionForCreate, '2.3.0');
+  const updateDiff = buildVersionAttributeDiff(existingVersion, desiredVersionUpdate, '2.3.0');
+
+  // Then
+  assert.equal(createDiff.action, 'create');
   assert.deepEqual(updateDiff.fields, { releaseType: 'AFTER_APPROVAL' });
 });
 
-test('assertEditableForChanges rejects changed metadata on noneditable versions', () => {
-  assert.throws(() => assertEditableForChanges({
+test('given a noneditable released version with pending metadata changes, when asserting editability, then an error is raised', () => {
+  // Given
+  const releasedVersion = {
     id: 'version-123',
     attributes: {
       versionString: '2.3.0',
       appStoreState: 'READY_FOR_DISTRIBUTION',
     },
-  }, {
+  };
+  const pendingChanges = {
     appInfoChanges: [],
     versionLocalizationChanges: [
       {
@@ -388,56 +525,57 @@ test('assertEditableForChanges rejects changed metadata on noneditable versions'
     ],
     versionAttributeChange: { changed: false },
     reviewDetailChange: { changed: false },
-  }), /not editable/);
-});
-
-test('loadAscState loads app info, version localizations, and review details', async () => {
-  const calls = [];
-  const ascRequest = async (method, apiPath) => {
-    calls.push([method, apiPath]);
-    if (apiPath.startsWith('/apps/') && apiPath.includes('/appInfos')) {
-      return { data: [{ id: 'app-info-123', type: 'appInfos' }] };
-    }
-    if (apiPath.startsWith('/appInfos/')) {
-      return {
-        data: [
-          {
-            id: 'app-info-loc-en-us',
-            attributes: { locale: 'en-US', name: 'WatchCloud', subtitle: 'Music' },
-          },
-        ],
-      };
-    }
-    if (apiPath.startsWith('/apps/')) {
-      return {
-        data: [
-          {
-            id: 'version-123',
-            attributes: {
-              versionString: '1.2.3',
-              appStoreState: 'PREPARE_FOR_SUBMISSION',
-            },
-          },
-        ],
-      };
-    }
-    if (apiPath.includes('/appStoreVersionLocalizations')) {
-      return JSON.parse(fs.readFileSync(path.join(fixturesDir, 'app-store-version-localizations.json'), 'utf8'));
-    }
-    if (apiPath.includes('/appStoreReviewDetail')) {
-      return {
-        data: {
-          id: 'review-123',
-          attributes: {
-            contactFirstName: 'Ada',
-          },
-        },
-      };
-    }
-    throw new Error(`Unexpected call ${apiPath}`);
   };
 
-  const state = await loadAscState(ascRequest, { ASC_APP_ID: '1234567890', ASC_VERSION: '1.2.3' });
+  // When
+  const assertEditable = () => assertEditableForChanges(releasedVersion, pendingChanges);
+
+  // Then
+  assert.throws(assertEditable, /not editable/);
+});
+
+test('given ASC API responses for app info, version, localizations, and review, when loading ASC state, then all state pieces are returned', async () => {
+  // Given
+  const { calls, request } = ascRoutes([
+    matchingAscRoute('/apps/1234567890/appInfos?limit=200', {
+      data: [{ id: 'app-info-123', type: 'appInfos' }],
+    }),
+    matchingAscRoute('/appInfos/app-info-123/appInfoLocalizations?limit=200', {
+      data: [
+        {
+          id: 'app-info-loc-en-us',
+          attributes: { locale: 'en-US', name: 'WatchCloud', subtitle: 'Music' },
+        },
+      ],
+    }),
+    matchingAscRoute('/apps/1234567890/appStoreVersions?limit=200', {
+      data: [
+        {
+          id: 'version-123',
+          attributes: {
+            versionString: '1.2.3',
+            appStoreState: 'PREPARE_FOR_SUBMISSION',
+          },
+        },
+      ],
+    }),
+    matchingAscRoute('/appStoreVersions/version-123/appStoreVersionLocalizations?limit=200', () => (
+      readJsonFixture('app-store-version-localizations.json')
+    )),
+    matchingAscRoute('/appStoreVersions/version-123/appStoreReviewDetail', {
+      data: {
+        id: 'review-123',
+        attributes: {
+          contactFirstName: 'Ada',
+        },
+      },
+    }),
+  ]);
+
+  // When
+  const state = await loadAscState(request, { ASC_APP_ID: '1234567890', ASC_VERSION: '1.2.3' });
+
+  // Then
   assert.equal(state.appVersion.id, 'version-123');
   assert.equal(state.appInfo.id, 'app-info-123');
   assert.equal(state.localizations.length, 5);
@@ -445,29 +583,30 @@ test('loadAscState loads app info, version localizations, and review details', a
   assert.equal(calls.length, 5);
 });
 
-test('loadAscState can allow a missing version for ensure-version dry-runs', async () => {
-  const ascRequest = async (method, apiPath) => {
-    if (apiPath.startsWith('/apps/') && apiPath.includes('/appInfos')) {
-      return { data: [{ id: 'app-info-123', type: 'appInfos' }] };
-    }
-    if (apiPath.startsWith('/appInfos/')) return { data: [] };
-    if (apiPath.startsWith('/apps/')) {
-      return {
-        data: [
-          {
-            id: 'version-123',
-            attributes: { versionString: '1.2.3' },
-          },
-        ],
-      };
-    }
-    throw new Error(`Unexpected call ${apiPath}`);
-  };
+test('given ASC has no matching version and missing versions are allowed, when loading ASC state, then version-specific state is empty', async () => {
+  // Given
+  const { request } = ascRoutes([
+    matchingAscRoute('/apps/1234567890/appInfos?limit=200', {
+      data: [{ id: 'app-info-123', type: 'appInfos' }],
+    }),
+    matchingAscRoute('/appInfos/app-info-123/appInfoLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/apps/1234567890/appStoreVersions?limit=200', {
+      data: [
+        {
+          id: 'version-123',
+          attributes: { versionString: '1.2.3' },
+        },
+      ],
+    }),
+  ]);
 
-  const state = await loadAscState(ascRequest, { ASC_APP_ID: '1234567890' }, {
+  // When
+  const state = await loadAscState(request, { ASC_APP_ID: '1234567890' }, {
     versionString: '2.0.0',
     allowMissingVersion: true,
   });
+
+  // Then
   assert.equal(state.appVersion, null);
   assert.deepEqual(state.versionLocalizations, []);
 });

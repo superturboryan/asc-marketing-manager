@@ -34,13 +34,13 @@ When using Google Sheets, Codex still needs access to the Google Sheets connecto
 Install the skill through skills.sh:
 
 ```zsh
-npx skills add https://github.com/superturboryan/asc-marketing-manager --skill asc-marketing-manager
+npx skills add superturboryan/asc-marketing-manager
 ```
 
 Install the plugin through Codex Marketplace:
 
 ```zsh
-npx codex-marketplace add superturboryan/asc-marketing-manager/plugins/asc-marketing-manager --plugin
+npx codex-marketplace add superturboryan/asc-marketing-manager --plugins
 ```
 
 ## At a Glance
