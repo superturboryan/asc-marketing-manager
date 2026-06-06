@@ -1,0 +1,49 @@
+# App Store Connect Credentials
+
+Use a Team API key from App Store Connect.
+
+## Create The Key
+
+1. Open App Store Connect.
+2. Go to **Users and Access**.
+3. Open **Integrations**.
+4. Open **App Store Connect API**.
+5. Use **Team Keys**.
+6. Generate a key.
+7. Choose the least privilege role that supports marketing metadata. For localized copy, screenshots, and app previews, use **Marketing**.
+8. Download the `.p8` private key immediately. Apple only allows downloading it once.
+
+## Store Locally
+
+```zsh
+mkdir -p ~/.appstoreconnect
+chmod 700 ~/.appstoreconnect
+mv ~/Downloads/AuthKey_<KEY_ID>.p8 ~/.appstoreconnect/
+chmod 600 ~/.appstoreconnect/AuthKey_<KEY_ID>.p8
+```
+
+Create an env file outside the repo:
+
+```zsh
+ASC_KEY_ID=<KEY_ID>
+ASC_ISSUER_ID=<ISSUER_ID>
+ASC_KEY_PATH=/Users/you/.appstoreconnect/AuthKey_<KEY_ID>.p8
+ASC_APP_ID=<APP_ID>
+ASC_VERSION=<VERSION>
+ASC_PLATFORM=IOS
+ASC_COPYRIGHT=2026 Your Name
+ASC_SHEET_ID=<GOOGLE_SHEET_ID>
+ASC_SHEET_NAME=<SHEET_TAB_NAME>
+```
+
+`ASC_VERSION` is optional when the version is provided with `--version` or
+`version.versionString` in desired JSON. `ASC_PLATFORM` and `ASC_COPYRIGHT` are only needed
+when using `--ensure-version` to create a missing App Store version.
+
+Secure it:
+
+```zsh
+chmod 600 ~/.appstoreconnect/*.env
+```
+
+Never commit `.env` files, JWTs, or `.p8` private keys.
