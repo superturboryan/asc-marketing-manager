@@ -775,8 +775,8 @@ function httpsRequest(method, url, token, body) {
 
 function printHelp() {
   console.log(`Usage:
-  node skill/scripts/asc-sync-metadata.mjs --env <path> --desired <path> [--version <version>] [--ensure-version] --dry-run
-  node skill/scripts/asc-sync-metadata.mjs --env <path> --desired <path> [--version <version>] [--ensure-version] --apply`);
+  node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs --env <path> --desired <path> [--version <version>] [--ensure-version] --dry-run
+  node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs --env <path> --desired <path> [--version <version>] [--ensure-version] --apply`);
 }
 
 async function main() {

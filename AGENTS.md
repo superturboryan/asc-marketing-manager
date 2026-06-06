@@ -2,36 +2,48 @@
 
 ## Project
 
-`asc-marketing-manager` is a publishable Codex skill for safely syncing localized App Store Connect marketing metadata.
+`asc-marketing-manager` is a Codex marketplace plugin for safely syncing localized App Store Connect marketing metadata.
 
 Current local path:
 
 `/Users/ryan/Developer/Xcode/asc-marketing-manager`
 
-Flattened standalone skill layout:
+Marketplace plugin layout:
 
 ```text
 asc-marketing-manager/
   README.md
   AGENTS.md
-  SKILL.md
-  scripts/
-    asc-sync-metadata.mjs
-  tests/
-    asc-sync-metadata.test.mjs
-    fixtures/
-      desired-valid.json
-      app-store-version-localizations.json
-  references/
-    desired-json-schema.md
-    app-store-connect-credentials.md
-    google-sheet-localizations.md
-  assets/
-    examples/
-      app.env.example
-      desired-metadata.example.json
-      localization-sheet-template.csv
-      pages-sheet-template.csv
+  LICENSE
+  .agents/
+    plugins/
+      marketplace.json
+  plugins/
+    asc-marketing-manager/
+      .codex-plugin/
+        plugin.json
+      assets/
+        icon.svg
+      skills/
+        asc-marketing-manager/
+          SKILL.md
+          scripts/
+            asc-sync-metadata.mjs
+          tests/
+            asc-sync-metadata.test.mjs
+            fixtures/
+              desired-valid.json
+              app-store-version-localizations.json
+          references/
+            desired-json-schema.md
+            app-store-connect-credentials.md
+            google-sheet-localizations.md
+          assets/
+            examples/
+              app.env.example
+              desired-metadata.example.json
+              localization-sheet-template.csv
+              pages-sheet-template.csv
 ```
 
 ## Current Status
@@ -42,7 +54,7 @@ Verification command:
 
 ```zsh
 cd /Users/ryan/Developer/Xcode/asc-marketing-manager
-node --test tests/*.test.mjs
+node --test plugins/asc-marketing-manager/skills/asc-marketing-manager/tests/*.test.mjs
 ```
 
 Last known result: 17 tests passed.
@@ -92,7 +104,7 @@ This matters. A previous Ruby signing attempt returned ASC `401`; the Node `ieee
 
 The script only talks to App Store Connect. It does not read or create Google Sheets directly. The skill/agent should read Google Sheets through the Google Sheets connector, then write transient desired-state JSON to `/private/tmp`.
 
-If `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, the skill can create a native Google Sheet first. New sheets should follow the WatchCloud strings format documented in `references/google-sheet-localizations.md`:
+If `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, the skill can create a native Google Sheet first. New sheets should follow the WatchCloud strings format documented in `plugins/asc-marketing-manager/skills/asc-marketing-manager/references/google-sheet-localizations.md`:
 
 - spreadsheet title pattern: `<App Name> strings 🌎🌍🌏`
 - `Pages` tab first
@@ -120,7 +132,7 @@ Use `ASC_SHEET_NAME` from the env file. If omitted, default to `ASC_VERSION`.
 Dry run:
 
 ```zsh
-node scripts/asc-sync-metadata.mjs \
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs \
   --env ~/.appstoreconnect/my-app.env \
   --desired /private/tmp/asc-desired-metadata.json \
   --version 2.3.0 \
@@ -131,7 +143,7 @@ node scripts/asc-sync-metadata.mjs \
 Apply:
 
 ```zsh
-node scripts/asc-sync-metadata.mjs \
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs \
   --env ~/.appstoreconnect/my-app.env \
   --desired /private/tmp/asc-desired-metadata.json \
   --version 2.3.0 \
@@ -233,9 +245,15 @@ The script normalizes trailing whitespace because ASC strips trailing whitespace
 
 ## Publishing Direction
 
-For v1, publish this as a standalone skill, not a plugin.
+This repo is now a GitHub marketplace source for a single skills-only Codex plugin.
 
-A plugin is only needed if this grows into a bundle with multiple skills, MCP servers, hooks, apps, or marketplace-level packaging.
+Install path:
+
+```zsh
+codex plugin marketplace add superturboryan/asc-marketing-manager
+```
+
+The `0.1.0` release remains a beta/pre-release and should be retagged to the latest plugin-ready commit after validation.
 
 Possible future plugin/collection name:
 

@@ -10,7 +10,9 @@ Use a Team API key from App Store Connect.
 4. Open **App Store Connect API**.
 5. Use **Team Keys**.
 6. Generate a key.
-7. Choose the least privilege role that supports marketing metadata. For localized copy, screenshots, and app previews, use **Marketing**.
+7. Choose the least privilege role that supports marketing metadata. For localized copy,
+   screenshots, and app previews, use **Marketing**. Do not use **Full Access** unless a future
+   workflow specifically requires it.
 8. Download the `.p8` private key immediately. Apple only allows downloading it once.
 
 ## Store Locally

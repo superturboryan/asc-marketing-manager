@@ -62,6 +62,9 @@ fields. The old top-level `locales` shape remains supported for `promotionalText
 ## Credentials
 
 Read `references/app-store-connect-credentials.md` before helping a user set up credentials. Never print full key IDs, issuer IDs, JWTs, `.p8` contents, or env files containing secrets.
+Tell users to follow the least privilege principle for App Store Connect API keys. Recommend the
+**Marketing** role for this skill's current metadata workflows, and do not request or recommend
+**Full Access**.
 
 ## Safety Rules
 

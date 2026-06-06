@@ -1,0 +1,20 @@
+{
+  "name": "asc-marketing-manager",
+  "interface": {
+    "displayName": "ASC Marketing Manager"
+  },
+  "plugins": [
+    {
+      "name": "asc-marketing-manager",
+      "source": {
+        "source": "local",
+        "path": "./plugins/asc-marketing-manager"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

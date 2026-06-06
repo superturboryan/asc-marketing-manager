@@ -4,16 +4,28 @@
 ![Node.js 18+](https://img.shields.io/badge/node-18%2B-339933)
 ![App Store Connect](https://img.shields.io/badge/App%20Store%20Connect-metadata-0A84FF)
 
-ASC Marketing Manager is a publishable Codex skill for safely syncing App Store Connect text metadata.
+ASC Marketing Manager is a Codex marketplace plugin for safely syncing App Store Connect text metadata.
 
 It reads localized marketing copy from Google Sheets or desired-state JSON, runs a dry-run comparison first, and applies only explicitly reviewed App Store Connect changes.
 
 Screenshot and app preview upload support is planned as a later command because asset uploads use a separate App Store Connect workflow.
 
+## Install In Codex
+
+Add this repo as a marketplace source:
+
+```zsh
+codex plugin marketplace add superturboryan/asc-marketing-manager
+```
+
+Then install or browse **ASC Marketing Manager** from that marketplace in Codex. The plugin bundles the `asc-marketing-manager` skill under `plugins/asc-marketing-manager/skills/asc-marketing-manager`.
+
+When using Google Sheets, Codex still needs access to the Google Sheets connector. The script itself only talks to App Store Connect and reads desired-state JSON from disk.
+
 ## At a Glance
 
 - Dry-run-first App Store Connect sync for localized text metadata.
-- Designed for Codex workflows, but the bundled Node script has no npm dependencies.
+- Installable as a Codex plugin, with a bundled Node script that has no npm dependencies.
 - Supports Google Sheets connector workflows and explicit desired-state JSON.
 - Keeps credentials outside the repo and redacts sensitive review/demo-account values.
 - Published as an early `0.1.0` pre-release; contributions are welcome.
@@ -73,7 +85,7 @@ New sheets follow the WatchCloud strings layout:
 - version tab headers: version label, `Name`, `Subtitle`, `Promotional Text`, `Description`, `What's new`, `Keywords`
 - `Reviewer Notes` section below the localization table
 
-Example CSV templates are in `assets/examples/localization-sheet-template.csv` and `assets/examples/pages-sheet-template.csv`. Full connector creation and extraction rules are in `references/google-sheet-localizations.md`.
+Example CSV templates are in `plugins/asc-marketing-manager/skills/asc-marketing-manager/assets/examples/localization-sheet-template.csv` and `plugins/asc-marketing-manager/skills/asc-marketing-manager/assets/examples/pages-sheet-template.csv`. Full connector creation and extraction rules are in `plugins/asc-marketing-manager/skills/asc-marketing-manager/references/google-sheet-localizations.md`.
 
 </details>
 
@@ -88,7 +100,9 @@ Create a Team API key:
 4. Open **App Store Connect API**.
 5. Use **Team Keys**.
 6. Generate a key.
-7. Choose **Marketing** for least-privilege metadata, screenshot, and app preview access.
+7. Choose the least-privilege role that supports this workflow. **Marketing** should be suitable
+   for App Store metadata, screenshots, and app previews; do not use **Full Access** unless a
+   future workflow specifically requires it.
 8. Download the `.p8` private key immediately. Apple only allows downloading it once.
 
 Store credentials outside the repo:
@@ -180,7 +194,7 @@ Use `fallbacks`, `appInfo.fallbacks`, or `version.fallbacks` for App Store Conne
 <summary><strong>Dry Run</strong></summary>
 
 ```zsh
-node scripts/asc-sync-metadata.mjs \
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs \
   --env ~/.appstoreconnect/my-app.env \
   --desired /private/tmp/asc-desired-metadata.json \
   --dry-run
@@ -189,7 +203,7 @@ node scripts/asc-sync-metadata.mjs \
 To start a new release if the version does not exist, include a version from `--version`, `ASC_VERSION`, or `version.versionString`, then add `--ensure-version`:
 
 ```zsh
-node scripts/asc-sync-metadata.mjs \
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs \
   --env ~/.appstoreconnect/my-app.env \
   --desired /private/tmp/asc-desired-metadata.json \
   --version 2.3.0 \
@@ -205,7 +219,7 @@ node scripts/asc-sync-metadata.mjs \
 Only apply after reviewing a clean dry-run:
 
 ```zsh
-node scripts/asc-sync-metadata.mjs \
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs \
   --env ~/.appstoreconnect/my-app.env \
   --desired /private/tmp/asc-desired-metadata.json \
   --apply
@@ -219,7 +233,7 @@ node scripts/asc-sync-metadata.mjs \
 Run unit tests with Node's built-in test runner:
 
 ```zsh
-node --test tests/*.test.mjs
+node --test plugins/asc-marketing-manager/skills/asc-marketing-manager/tests/*.test.mjs
 ```
 
 Tests do not call App Store Connect and do not require real credentials.

@@ -1,0 +1,42 @@
+{
+  "name": "asc-marketing-manager",
+  "version": "0.1.0",
+  "description": "Safely sync localized App Store Connect text metadata with dry-run-first Codex workflows.",
+  "author": {
+    "name": "SuperTurboRyan",
+    "url": "https://github.com/superturboryan"
+  },
+  "homepage": "https://github.com/superturboryan/asc-marketing-manager",
+  "repository": "https://github.com/superturboryan/asc-marketing-manager",
+  "license": "MIT",
+  "keywords": [
+    "codex-skill",
+    "app-store-connect",
+    "ios",
+    "localization",
+    "metadata",
+    "release-notes"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ASC Marketing Manager",
+    "shortDescription": "Sync localized App Store Connect metadata with dry-run safety.",
+    "longDescription": "ASC Marketing Manager helps Codex read localized App Store marketing copy from Google Sheets or desired-state JSON, run a safe App Store Connect dry run, and apply only explicitly reviewed text metadata changes.",
+    "developerName": "SuperTurboRyan",
+    "category": "Productivity",
+    "capabilities": [
+      "App Store Connect metadata",
+      "Localization workflows",
+      "Dry-run review"
+    ],
+    "websiteURL": "https://github.com/superturboryan/asc-marketing-manager",
+    "defaultPrompt": [
+      "Sync my App Store Connect metadata from a sheet.",
+      "Dry-run localized release notes for my app.",
+      "Help set up ASC metadata credentials safely."
+    ],
+    "brandColor": "#0A84FF",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg"
+  }
+}
