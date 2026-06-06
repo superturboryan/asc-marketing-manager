@@ -20,6 +20,12 @@ codex plugin marketplace add superturboryan/asc-marketing-manager
 
 Then install or browse **ASC Marketing Manager** from that marketplace in Codex. The plugin bundles the `asc-marketing-manager` skill under `plugins/asc-marketing-manager/skills/asc-marketing-manager`.
 
+Start the workflow from a new Codex thread with:
+
+```text
+/asc-marketing-manager
+```
+
 When using Google Sheets, Codex still needs access to the Google Sheets connector. The script itself only talks to App Store Connect and reads desired-state JSON from disk.
 
 ## At a Glance

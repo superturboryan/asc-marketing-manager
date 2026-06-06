@@ -1,12 +1,9 @@
 ---
 name: asc-marketing-manager
 description: Sync App Store Connect marketing metadata safely, including localized name, subtitle, description, keywords, support URL, marketing URL, What's New, Promotional Text, App Review text fields, and release-version setup from Google Sheets or desired-state JSON. Use when updating localized App Store copy or starting a new editable App Store version.
-metadata:
-  display_name: ASC Marketing Manager
-  short_description: Sync localized App Store Connect marketing metadata with dry-run safety.
 ---
 
-# ASC Marketing Manager
+# Workflow
 
 Use this skill to update App Store Connect text metadata with a dry-run-first workflow.
 
