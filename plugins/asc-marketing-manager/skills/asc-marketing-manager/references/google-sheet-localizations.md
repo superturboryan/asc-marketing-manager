@@ -17,11 +17,13 @@ before running the ASC script.
    `<App Name> strings`.
 5. Create or rename tabs so the spreadsheet has:
    - `Pages` as the first tab
-   - one version tab named from `ASC_SHEET_NAME`, or `ASC_VERSION` when `ASC_SHEET_NAME` is omitted
+   - one version tab named from `ASC_SHEET_NAME`; if omitted, use the confirmed target version
 6. If the spreadsheet exists but the target version tab is missing, add only the missing version tab
    with the WatchCloud-style seed rows; do not duplicate unrelated tabs.
 7. Tell the user the new spreadsheet ID and link, and tell them to add `ASC_SHEET_ID=<id>` and
    `ASC_SHEET_NAME=<version tab>` to their env file.
+
+Prefer `ASC_SHEET_NAME` for sheet routing when the sheet tab is not exactly the target version.
 
 Do not run the ASC apply step immediately after creating a blank sheet. The user must fill and
 review the localization rows first.

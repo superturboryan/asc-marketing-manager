@@ -108,7 +108,7 @@ If `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, the skill can c
 
 - spreadsheet title pattern: `<App Name> strings 🌎🌍🌏`
 - `Pages` tab first
-- one version tab named from `ASC_SHEET_NAME`, or `ASC_VERSION` when omitted
+- one version tab named from `ASC_SHEET_NAME`; if omitted, use the confirmed target version
 - row 1: version label, `Name`, `Subtitle`, `Promotional Text`, `Description`, `What's new`, `Keywords`
 - localization rows keyed by display labels such as `English 🇺🇸`
 - `Reviewer Notes` below the localization table
@@ -125,7 +125,9 @@ Expected sheet mapping:
 - If a WatchCloud-style sheet needs localized URL overrides, add optional columns named exactly
   `supportUrl` and `marketingUrl` after `Keywords`.
 
-Use `ASC_SHEET_NAME` from the env file. If omitted, default to `ASC_VERSION`.
+Use `ASC_SHEET_NAME` from the env file for sheet routing. If omitted, use the confirmed target
+version. If the user's prompt does not specify which App Store version to edit or create, stop and
+ask before reading sheets or running the ASC script.
 
 ## Script Commands
 
@@ -164,14 +166,14 @@ ASC_KEY_ID=...
 ASC_ISSUER_ID=...
 ASC_KEY_PATH=/Users/you/.appstoreconnect/AuthKey_XXXXXXXXXX.p8
 ASC_APP_ID=...
-ASC_VERSION=...
 ASC_PLATFORM=...
 ASC_COPYRIGHT=...
 ASC_SHEET_ID=...
 ASC_SHEET_NAME=...
 ```
 
-`ASC_VERSION` can be replaced by `--version` or `version.versionString`.
+Keep the target App Store version out of shared credential files. Provide it with `--version` or
+`version.versionString`. If the user did not specify the target version in their prompt, ask for it.
 `ASC_PLATFORM` and `ASC_COPYRIGHT` are only needed when creating a missing version.
 
 Recommended permissions:

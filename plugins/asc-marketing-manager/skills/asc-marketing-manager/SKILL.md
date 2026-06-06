@@ -12,7 +12,7 @@ Use this skill to update App Store Connect text metadata with a dry-run-first wo
 1. Confirm the target app, version, and credential env file.
 2. If using Google Sheets, read `references/google-sheet-localizations.md` first.
    - sheet ID from `ASC_SHEET_ID`
-   - tab from `ASC_SHEET_NAME`, defaulting to `ASC_VERSION` only when omitted
+   - tab from `ASC_SHEET_NAME`; if omitted, use the confirmed target version
    - if `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, create a native Google
      Sheet with the Google Sheets connector before asking the user to fill copy
    - new sheets should follow the WatchCloud strings layout: a `Pages` tab plus one version tab
@@ -22,9 +22,10 @@ Use this skill to update App Store Connect text metadata with a dry-run-first wo
 5. Require explicit user confirmation before running `--apply`.
 6. After apply, rely on the script's re-fetch verification before reporting success.
 
-If the target version does not exist, ask the user for the version number unless it is already in
-`ASC_VERSION`, `--version`, or `version.versionString`. Use `--ensure-version` only when the user
-wants to start a new editable release. Dry-run reports the version creation; apply creates it.
+If the user's prompt does not specify which App Store version to edit or create, stop and ask for
+the target version before reading sheets or running the script. Use `--ensure-version` only when
+the user wants to start a new editable release. Dry-run reports the version creation; apply creates
+it.
 
 ## Script
 

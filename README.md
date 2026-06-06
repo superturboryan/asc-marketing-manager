@@ -102,7 +102,7 @@ New sheets follow the WatchCloud strings layout:
 
 - spreadsheet title pattern: `<App Name> strings 🌎🌍🌏`
 - `Pages` tab first, for storefront flag and App Store URL reference rows
-- version tab named from `ASC_SHEET_NAME`, or `ASC_VERSION` when `ASC_SHEET_NAME` is omitted
+- version tab named from `ASC_SHEET_NAME`; if omitted, use the confirmed target version
 - version tab headers: version label, `Name`, `Subtitle`, `Promotional Text`, `Description`, `What's new`, `Keywords`
 - `Reviewer Notes` section below the localization table
 
@@ -142,12 +142,14 @@ ASC_KEY_ID=<KEY_ID>
 ASC_ISSUER_ID=<ISSUER_ID>
 ASC_KEY_PATH=/Users/you/.appstoreconnect/AuthKey_<KEY_ID>.p8
 ASC_APP_ID=<APP_ID>
-ASC_VERSION=<VERSION>
 ASC_PLATFORM=IOS
 ASC_COPYRIGHT=2026 Your Name
 ASC_SHEET_ID=<GOOGLE_SHEET_ID>
 ASC_SHEET_NAME=<SHEET_TAB_NAME>
 ```
+
+Keep the target App Store version out of shared credential files. Provide it with `--version` or
+`version.versionString` in desired JSON.
 
 Secure it:
 
@@ -221,7 +223,8 @@ node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync
   --dry-run
 ```
 
-To start a new release if the version does not exist, include a version from `--version`, `ASC_VERSION`, or `version.versionString`, then add `--ensure-version`:
+To start a new release if the version does not exist, include a version from `--version` or
+`version.versionString`, then add `--ensure-version`:
 
 ```zsh
 node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs \

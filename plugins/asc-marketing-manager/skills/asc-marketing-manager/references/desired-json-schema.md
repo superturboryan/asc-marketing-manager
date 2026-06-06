@@ -54,7 +54,8 @@ The ASC sync script accepts desired-state JSON with App Store Connect text metad
 
 - `appInfo.locales`: optional object keyed by ASC locale code for `name` and `subtitle`.
 - `version.locales`: optional object keyed by ASC locale code for `promotionalText`, `description`, `keywords`, `supportUrl`, `marketingUrl`, and `whatsNew`.
-- `version.versionString`: optional when `ASC_VERSION` or `--version` is provided.
+- `version.versionString`: optional only when `--version` is provided. Required with
+  `--ensure-version` when creating a missing version unless `--version` is provided.
 - `version.platform`: optional for existing versions; defaults to `ASC_PLATFORM` or `IOS` when creating a version.
 - `version.copyright`: required for `--ensure-version --apply` unless `ASC_COPYRIGHT` is set.
 - `version.releaseType`: optional; one of `MANUAL`, `AFTER_APPROVAL`, or `SCHEDULED`; defaults to `MANUAL` when creating a version.

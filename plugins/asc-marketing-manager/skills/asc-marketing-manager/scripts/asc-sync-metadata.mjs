@@ -325,10 +325,10 @@ export function validateLocaleCode(locale) {
   }
 }
 
-export function resolveVersionString(args, env, desired) {
-  const versionString = args.version ?? desired.version.versionString ?? env.ASC_VERSION;
+export function resolveVersionString(args, desired) {
+  const versionString = args.version ?? desired.version.versionString;
   if (!versionString) {
-    throw new Error('Missing version string. Provide --version <version>, ASC_VERSION, or version.versionString in desired JSON.');
+    throw new Error('Missing version string. Provide --version <version> or version.versionString in desired JSON.');
   }
   return versionString;
 }
@@ -357,7 +357,7 @@ export function createAscClient(env, requestFn = httpsRequest) {
   };
 }
 
-export async function loadAscState(ascRequest, env, { versionString = env.ASC_VERSION, allowMissingVersion = false } = {}) {
+export async function loadAscState(ascRequest, env, { versionString, allowMissingVersion = false } = {}) {
   const [appInfo, appVersion] = await Promise.all([
     loadAppInfoState(ascRequest, env),
     loadAppVersion(ascRequest, env, versionString, allowMissingVersion),
@@ -394,12 +394,18 @@ async function loadAppInfoState(ascRequest, env) {
 }
 
 async function loadAppVersion(ascRequest, env, versionString, allowMissingVersion) {
+  if (!versionString) {
+    throw new Error('Missing version string. Provide --version <version> or version.versionString in desired JSON.');
+  }
+
   const versionResponse = await ascRequest('GET', `/apps/${encodeURIComponent(env.ASC_APP_ID)}/appStoreVersions?limit=200`);
-  const appVersion = versionResponse.data?.find((version) => version.attributes?.versionString === versionString);
+  const versions = versionResponse.data ?? [];
+
+  const appVersion = versions.find((version) => version.attributes?.versionString === versionString);
   if (appVersion) return appVersion;
   if (allowMissingVersion) return null;
 
-  const seen = [...new Set((versionResponse.data ?? []).map((version) => version.attributes?.versionString).filter(Boolean))];
+  const seen = [...new Set(versions.map((version) => version.attributes?.versionString).filter(Boolean))];
   throw new Error(`Could not find ASC version ${versionString}. Saw: ${seen.join(', ') || 'none'}.`);
 }
 
@@ -788,7 +794,7 @@ async function main() {
 
   const env = validateEnv(parseEnvFile(fs.readFileSync(expandHome(args.env), 'utf8')));
   const desired = parseDesiredMetadata(fs.readFileSync(expandHome(args.desired), 'utf8'));
-  const versionString = resolveVersionString(args, env, desired);
+  const versionString = resolveVersionString(args, desired);
   const desiredAppInfoLocales = expandFallbackLocales(desired.appInfo);
   const desiredVersionLocales = expandFallbackLocales(desired.version);
 

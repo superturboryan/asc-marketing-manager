@@ -31,16 +31,15 @@ ASC_KEY_ID=<KEY_ID>
 ASC_ISSUER_ID=<ISSUER_ID>
 ASC_KEY_PATH=/Users/you/.appstoreconnect/AuthKey_<KEY_ID>.p8
 ASC_APP_ID=<APP_ID>
-ASC_VERSION=<VERSION>
 ASC_PLATFORM=IOS
 ASC_COPYRIGHT=2026 Your Name
 ASC_SHEET_ID=<GOOGLE_SHEET_ID>
 ASC_SHEET_NAME=<SHEET_TAB_NAME>
 ```
 
-`ASC_VERSION` is optional when the version is provided with `--version` or
-`version.versionString` in desired JSON. `ASC_PLATFORM` and `ASC_COPYRIGHT` are only needed
-when using `--ensure-version` to create a missing App Store version.
+Keep the target App Store version out of shared credential files. Provide it with `--version` or
+`version.versionString` in desired JSON. `ASC_PLATFORM` and `ASC_COPYRIGHT` are only needed when
+using `--ensure-version` to create a missing App Store version.
 
 Secure it:
 

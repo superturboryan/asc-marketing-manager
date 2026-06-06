@@ -95,7 +95,7 @@ const ascRoutes = (routes) => {
   return { calls, request };
 };
 
-test('given an env file without ASC_VERSION, when parsing and validating it, then ASC_VERSION is optional', () => {
+test('given an env file without a version, when parsing and validating it, then credentials are valid', () => {
   // Given
   const envFileContents = `
 ASC_KEY_ID=ABCD1234EF
@@ -459,22 +459,19 @@ test('given review detail changes include a password, when diffing and summarizi
   assert.equal(payload.data.attributes.demoAccountPassword, 'new-secret');
 });
 
-test('given args, desired metadata, and env all contain version values, when resolving the version string, then args win before desired and env', () => {
+test('given args and desired metadata contain version values, when resolving the version string, then args win before desired', () => {
   // Given
-  const env = { ASC_VERSION: '1.0' };
   const desired = { version: { versionString: '2.0' } };
   const desiredWithoutVersion = { version: {} };
 
   // When
-  const versionFromArgs = resolveVersionString({ version: '3.0' }, env, desired);
-  const versionFromDesired = resolveVersionString({}, env, desired);
-  const versionFromEnv = resolveVersionString({}, env, desiredWithoutVersion);
-  const resolveMissingVersion = () => resolveVersionString({}, {}, desiredWithoutVersion);
+  const versionFromArgs = resolveVersionString({ version: '3.0' }, desired);
+  const versionFromDesired = resolveVersionString({}, desired);
+  const resolveMissingVersion = () => resolveVersionString({}, desiredWithoutVersion);
 
   // Then
   assert.equal(versionFromArgs, '3.0');
   assert.equal(versionFromDesired, '2.0');
-  assert.equal(versionFromEnv, '1.0');
   assert.throws(resolveMissingVersion, /Missing version string/);
 });
 
@@ -573,7 +570,7 @@ test('given ASC API responses for app info, version, localizations, and review, 
   ]);
 
   // When
-  const state = await loadAscState(request, { ASC_APP_ID: '1234567890', ASC_VERSION: '1.2.3' });
+  const state = await loadAscState(request, { ASC_APP_ID: '1234567890' }, { versionString: '1.2.3' });
 
   // Then
   assert.equal(state.appVersion.id, 'version-123');
