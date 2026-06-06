@@ -1,6 +1,7 @@
 # ASC Marketing Manager
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![skills.sh](https://skills.sh/b/superturboryan/asc-marketing-manager)](https://skills.sh/superturboryan/asc-marketing-manager/asc-marketing-manager)
 ![Node.js 18+](https://img.shields.io/badge/node-18%2B-339933)
 ![App Store Connect](https://img.shields.io/badge/App%20Store%20Connect-metadata-0A84FF)
 
@@ -27,6 +28,20 @@ Start the workflow from a new Codex thread with:
 ```
 
 When using Google Sheets, Codex still needs access to the Google Sheets connector. The script itself only talks to App Store Connect and reads desired-state JSON from disk.
+
+### Other Install Paths
+
+Install the skill through skills.sh:
+
+```zsh
+npx skills add https://github.com/superturboryan/asc-marketing-manager --skill asc-marketing-manager
+```
+
+Install the plugin through Codex Marketplace:
+
+```zsh
+npx codex-marketplace add superturboryan/asc-marketing-manager/plugins/asc-marketing-manager --plugin
+```
 
 ## At a Glance
 
