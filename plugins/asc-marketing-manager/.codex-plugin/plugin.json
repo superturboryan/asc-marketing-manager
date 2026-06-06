@@ -1,6 +1,6 @@
 {
   "name": "asc-marketing-manager",
-  "version": "0.1.0+codex.20260606160038",
+  "version": "0.1.0",
   "description": "Safely sync localized App Store Connect text metadata with dry-run-first Codex workflows.",
   "author": {
     "name": "SuperTurboRyan",
