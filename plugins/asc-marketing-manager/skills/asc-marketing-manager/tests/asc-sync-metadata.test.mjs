@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  applySyncPlan,
   assertEditableForChanges,
   buildAppInfoDiff,
   buildAppStoreVersionCreatePayload,
@@ -14,6 +15,7 @@ import {
   buildPatchPayload,
   buildReviewDetailDiff,
   buildReviewDetailPayload,
+  buildSyncPlan,
   buildVersionAttributeDiff,
   buildVersionLocalizationDiff,
   expandFallbackLocales,
@@ -22,13 +24,16 @@ import {
   parseDesiredMetadata,
   parseEnvFile,
   redactValue,
+  redactSecrets,
   resolveVersionString,
+  runSync,
   summarizeDiff,
   summarizeReviewDiff,
   unicodeLength,
   utf8ByteLength,
   validateDesiredMetadata,
   validateEnv,
+  desiredMetadataFromSheetRows,
 } from '../scripts/asc-sync-metadata.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -239,6 +244,26 @@ test('given desired metadata that exceeds field limits or has a bad URL, when va
       name: 'URL protocol requirement',
       given: { version: { locales: { 'en-US': { supportUrl: 'example.com/support' } } } },
       then: /valid URL/,
+    },
+    {
+      name: 'URL web scheme requirement',
+      given: { version: { locales: { 'en-US': { marketingUrl: 'ftp://example.com' } } } },
+      then: /https URL/,
+    },
+    {
+      name: 'app info control characters',
+      given: { appInfo: { locales: { ja: { name: 'WatchCloud:\nSoundCloudプレーヤー' } } } },
+      then: /control characters/,
+    },
+    {
+      name: 'Apple device name in subtitle',
+      given: { appInfo: { locales: { hi: { subtitle: 'Apple Watch पर SoundCloud' } } } },
+      then: /Apple device names/,
+    },
+    {
+      name: 'Apple device name in app name',
+      given: { appInfo: { locales: { 'en-US': { name: 'Player for iPhone' } } } },
+      then: /Apple device names/,
     },
     {
       name: 'review notes byte limit',
@@ -531,6 +556,38 @@ test('given a noneditable released version with pending metadata changes, when a
   assert.throws(assertEditable, /not editable/);
 });
 
+test('given a noneditable released version with only promotional text changes, when asserting editability, then it is allowed', () => {
+  // Given
+  const releasedVersion = {
+    id: 'version-123',
+    attributes: {
+      versionString: '2.3.0',
+      appVersionState: 'READY_FOR_SALE',
+    },
+  };
+  const pendingChanges = {
+    appInfoChanges: [],
+    versionLocalizationChanges: [
+      {
+        changed: true,
+        resourceType: 'appStoreVersionLocalizations',
+        action: 'update',
+        fields: {
+          promotionalText: 'Updated promotional text',
+        },
+      },
+    ],
+    versionAttributeChange: { changed: false },
+    reviewDetailChange: { changed: false },
+  };
+
+  // When
+  const assertEditable = () => assertEditableForChanges(releasedVersion, pendingChanges);
+
+  // Then
+  assert.doesNotThrow(assertEditable);
+});
+
 test('given ASC API responses for app info, version, localizations, and review, when loading ASC state, then all state pieces are returned', async () => {
   // Given
   const { calls, request } = ascRoutes([
@@ -580,6 +637,60 @@ test('given ASC API responses for app info, version, localizations, and review, 
   assert.equal(calls.length, 5);
 });
 
+test('given ASC returns live and editable app info resources, when loading state, then editable app info is selected', async () => {
+  // Given
+  const { calls, request } = ascRoutes([
+    matchingAscRoute('/apps/1234567890/appInfos?limit=200', {
+      data: [
+        {
+          id: 'app-info-live',
+          type: 'appInfos',
+          attributes: { appStoreState: 'READY_FOR_SALE', state: 'READY_FOR_DISTRIBUTION' },
+        },
+        {
+          id: 'app-info-editable',
+          type: 'appInfos',
+          attributes: { appStoreState: 'PREPARE_FOR_SUBMISSION', state: 'PREPARE_FOR_SUBMISSION' },
+        },
+      ],
+    }),
+    matchingAscRoute('/appInfos/app-info-editable/appInfoLocalizations?limit=200', {
+      data: [
+        {
+          id: 'app-info-loc-en-us',
+          attributes: { locale: 'en-US', name: 'WatchCloud', subtitle: 'Music' },
+        },
+      ],
+    }),
+    matchingAscRoute('/apps/1234567890/appStoreVersions?limit=200', {
+      data: [
+        {
+          id: 'version-123',
+          attributes: {
+            versionString: '1.2.3',
+            appStoreState: 'PREPARE_FOR_SUBMISSION',
+          },
+        },
+      ],
+    }),
+    matchingAscRoute('/appStoreVersions/version-123/appStoreVersionLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/appStoreVersions/version-123/appStoreReviewDetail', { data: null }),
+  ]);
+
+  // When
+  const state = await loadAscState(request, { ASC_APP_ID: '1234567890' }, { versionString: '1.2.3' });
+
+  // Then
+  assert.equal(state.appInfo.id, 'app-info-editable');
+  assert.deepEqual(calls.map(([method, apiPath]) => `${method} ${apiPath}`), [
+    'GET /apps/1234567890/appInfos?limit=200',
+    'GET /apps/1234567890/appStoreVersions?limit=200',
+    'GET /appInfos/app-info-editable/appInfoLocalizations?limit=200',
+    'GET /appStoreVersions/version-123/appStoreVersionLocalizations?limit=200',
+    'GET /appStoreVersions/version-123/appStoreReviewDetail',
+  ]);
+});
+
 test('given ASC has no matching version and missing versions are allowed, when loading ASC state, then version-specific state is empty', async () => {
   // Given
   const { request } = ascRoutes([
@@ -606,4 +717,427 @@ test('given ASC has no matching version and missing versions are allowed, when l
   // Then
   assert.equal(state.appVersion, null);
   assert.deepEqual(state.versionLocalizations, []);
+});
+
+test('given ASC returns same version string on multiple platforms, when loading state, then the target platform is selected', async () => {
+  // Given
+  const { request } = ascRoutes([
+    matchingAscRoute('/apps/1234567890/appInfos?limit=200', {
+      data: [{ id: 'app-info-123', type: 'appInfos' }],
+    }),
+    matchingAscRoute('/appInfos/app-info-123/appInfoLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/apps/1234567890/appStoreVersions?limit=200', {
+      data: [
+        {
+          id: 'version-macos',
+          attributes: { versionString: '2.0.0', platform: 'MAC_OS' },
+        },
+        {
+          id: 'version-ios',
+          attributes: { versionString: '2.0.0', platform: 'IOS' },
+        },
+      ],
+    }),
+    matchingAscRoute('/appStoreVersions/version-ios/appStoreVersionLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/appStoreVersions/version-ios/appStoreReviewDetail', { data: null }),
+  ]);
+
+  // When
+  const state = await loadAscState(request, { ASC_APP_ID: '1234567890', ASC_PLATFORM: 'IOS' }, {
+    versionString: '2.0.0',
+  });
+
+  // Then
+  assert.equal(state.appVersion.id, 'version-ios');
+});
+
+test('given ASC returns same version string on multiple platforms without a target platform, when missing versions are allowed, then lookup still fails as ambiguous', async () => {
+  // Given
+  const { request } = ascRoutes([
+    matchingAscRoute('/apps/1234567890/appInfos?limit=200', {
+      data: [{ id: 'app-info-123', type: 'appInfos' }],
+    }),
+    matchingAscRoute('/appInfos/app-info-123/appInfoLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/apps/1234567890/appStoreVersions?limit=200', {
+      data: [
+        {
+          id: 'version-macos',
+          attributes: { versionString: '2.0.0', platform: 'MAC_OS' },
+        },
+        {
+          id: 'version-ios',
+          attributes: { versionString: '2.0.0', platform: 'IOS' },
+        },
+      ],
+    }),
+  ]);
+
+  // When
+  const loadState = () => loadAscState(request, { ASC_APP_ID: '1234567890' }, {
+    versionString: '2.0.0',
+    allowMissingVersion: true,
+  });
+
+  // Then
+  await assert.rejects(loadState, /ambiguous across platforms/);
+});
+
+test('given ASC paginates app versions, when loading state, then next links are followed', async () => {
+  // Given
+  const nextVersionsPath = 'https://api.appstoreconnect.apple.com/v1/apps/1234567890/appStoreVersions?cursor=next';
+  const { request } = ascRoutes([
+    matchingAscRoute('/apps/1234567890/appInfos?limit=200', {
+      data: [{ id: 'app-info-123', type: 'appInfos' }],
+    }),
+    matchingAscRoute('/appInfos/app-info-123/appInfoLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/apps/1234567890/appStoreVersions?limit=200', {
+      data: [{ id: 'old-version', attributes: { versionString: '1.0.0', platform: 'IOS' } }],
+      links: { next: nextVersionsPath },
+    }),
+    matchingAscRoute(nextVersionsPath, {
+      data: [{ id: 'version-200', attributes: { versionString: '2.0.0', platform: 'IOS' } }],
+    }),
+    matchingAscRoute('/appStoreVersions/version-200/appStoreVersionLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/appStoreVersions/version-200/appStoreReviewDetail', { data: null }),
+  ]);
+
+  // When
+  const state = await loadAscState(request, { ASC_APP_ID: '1234567890', ASC_PLATFORM: 'IOS' }, {
+    versionString: '2.0.0',
+  });
+
+  // Then
+  assert.equal(state.appVersion.id, 'version-200');
+});
+
+test('given ensure-version dry-run and missing ASC version, when running the CLI seam, then all planned changes are summarized', async () => {
+  // Given
+  const desired = validNestedDesired();
+  desired.version.versionString = '9.9.9';
+  const outputs = [];
+  const readFile = (filePath) => {
+    if (filePath === '/tmp/test.env') {
+      return `
+ASC_KEY_ID=ABCD1234EF
+ASC_ISSUER_ID=issuer-id
+ASC_KEY_PATH=/tmp/AuthKey_ABCD1234EF.p8
+ASC_APP_ID=1234567890
+ASC_PLATFORM=IOS
+ASC_COPYRIGHT=2026 Example
+`;
+    }
+    if (filePath === '/tmp/desired.json') return JSON.stringify(desired);
+    throw new Error(`Unexpected read ${filePath}`);
+  };
+  const { calls, request } = ascRoutes([
+    matchingAscRoute('/apps/1234567890/appInfos?limit=200', {
+      data: [{ id: 'app-info-123', type: 'appInfos' }],
+    }),
+    matchingAscRoute('/appInfos/app-info-123/appInfoLocalizations?limit=200', { data: [] }),
+    matchingAscRoute('/apps/1234567890/appStoreVersions?limit=200', { data: [] }),
+  ]);
+
+  // When
+  await runSync({
+    argv: ['--env', '/tmp/test.env', '--desired', '/tmp/desired.json', '--ensure-version', '--dry-run'],
+    readFile,
+    ascRequest: request,
+    checkKeyFile: false,
+    logger: { log: (line) => outputs.push(line) },
+  });
+
+  // Then
+  assert.deepEqual(calls.map(([method]) => method), ['GET', 'GET', 'GET']);
+  assert.match(outputs.join('\n'), /ASC version 9\.9\.9: would create/);
+  assert.match(outputs.join('\n'), /appInfo localizations:/);
+  assert.match(outputs.join('\n'), /version localizations:/);
+  assert.match(outputs.join('\n'), /review: CREATE/);
+  assert.match(outputs.join('\n'), /appStoreVersions/);
+  assert.match(outputs.join('\n'), /appStoreVersionLocalizations:en-US/);
+});
+
+test('given apply mode with changed metadata, when running the CLI seam, then writes are applied and verified from the sync plan', async () => {
+  // Given
+  const desired = validNestedDesired();
+  const outputs = [];
+  const calls = [];
+  let patchCount = 0;
+  const readFile = (filePath) => {
+    if (filePath === '/tmp/test.env') {
+      return `
+ASC_KEY_ID=ABCD1234EF
+ASC_ISSUER_ID=issuer-id
+ASC_KEY_PATH=/tmp/AuthKey_ABCD1234EF.p8
+ASC_APP_ID=1234567890
+ASC_PLATFORM=IOS
+`;
+    }
+    if (filePath === '/tmp/desired.json') return JSON.stringify(desired);
+    throw new Error(`Unexpected read ${filePath}`);
+  };
+  const request = async (method, apiPath, body = null) => {
+    calls.push({ method, apiPath, body });
+    if (method === 'PATCH') {
+      patchCount += 1;
+      return { data: { id: body.data.id, type: body.data.type, attributes: body.data.attributes } };
+    }
+
+    const verifying = patchCount > 0;
+    if (apiPath === '/apps/1234567890/appInfos?limit=200') {
+      return { data: [{ id: 'app-info-123', type: 'appInfos' }] };
+    }
+    if (apiPath === '/appInfos/app-info-123/appInfoLocalizations?limit=200') {
+      return {
+        data: [
+          {
+            id: 'app-info-loc-en-us',
+            type: 'appInfoLocalizations',
+            attributes: verifying
+              ? { locale: 'en-US', ...desired.appInfo.locales['en-US'] }
+              : { locale: 'en-US', name: 'WatchCloud', subtitle: 'Old subtitle' },
+          },
+        ],
+      };
+    }
+    if (apiPath === '/apps/1234567890/appStoreVersions?limit=200') {
+      return {
+        data: [
+          {
+            id: 'version-123',
+            type: 'appStoreVersions',
+            attributes: verifying
+              ? {
+                versionString: '2.3.0',
+                platform: 'IOS',
+                appVersionState: 'PREPARE_FOR_SUBMISSION',
+                copyright: desired.version.copyright,
+                releaseType: desired.version.releaseType,
+                usesIdfa: desired.version.usesIdfa,
+              }
+              : {
+                versionString: '2.3.0',
+                platform: 'IOS',
+                appVersionState: 'PREPARE_FOR_SUBMISSION',
+                copyright: '2025 Example',
+                releaseType: 'MANUAL',
+                usesIdfa: true,
+              },
+          },
+        ],
+      };
+    }
+    if (apiPath === '/appStoreVersions/version-123/appStoreVersionLocalizations?limit=200') {
+      return {
+        data: [
+          {
+            id: 'version-loc-en-us',
+            type: 'appStoreVersionLocalizations',
+            attributes: verifying
+              ? { locale: 'en-US', ...desired.version.locales['en-US'] }
+              : { locale: 'en-US', promotionalText: 'Old promo', description: 'Old description' },
+          },
+        ],
+      };
+    }
+    if (apiPath === '/appStoreVersions/version-123/appStoreReviewDetail') {
+      return {
+        data: {
+          id: 'review-123',
+          type: 'appStoreReviewDetails',
+          attributes: verifying ? desired.review : { contactFirstName: 'Old', notes: 'Old notes' },
+        },
+      };
+    }
+    throw new Error(`Unexpected call ${method} ${apiPath}`);
+  };
+
+  // When
+  await runSync({
+    argv: ['--env', '/tmp/test.env', '--desired', '/tmp/desired.json', '--apply'],
+    readFile,
+    ascRequest: request,
+    checkKeyFile: false,
+    logger: { log: (line) => outputs.push(line) },
+  });
+
+  // Then
+  assert.deepEqual(calls.filter((call) => call.method === 'PATCH').map((call) => call.apiPath), [
+    '/appStoreVersions/version-123',
+    '/appInfoLocalizations/app-info-loc-en-us',
+    '/appStoreVersionLocalizations/version-loc-en-us',
+    '/appStoreReviewDetails/review-123',
+  ]);
+  assert.equal(calls.find((call) => call.apiPath === '/appStoreVersions/version-123').body.data.attributes.platform, undefined);
+  assert.match(outputs.join('\n'), /Verified sync/);
+});
+
+test('given app info create auto-creates a version localization, when applying sync plan, then version localizations are re-fetched before write', async () => {
+  // Given
+  const desired = {
+    appInfo: {
+      locales: {
+        tr: {
+          name: 'WatchCloud: SoundCloud Player',
+          subtitle: 'SoundCloud saatinizde',
+        },
+      },
+    },
+    version: {
+      versionString: '2.3.0',
+      locales: {
+        tr: {
+          promotionalText: 'Promo TR',
+          description: 'Description TR',
+          whatsNew: '+ Notes TR',
+          keywords: 'soundcloud,müzik',
+        },
+      },
+    },
+    review: null,
+  };
+  const state = {
+    appInfo: { id: 'app-info-123', type: 'appInfos' },
+    appInfoLocalizations: [],
+    appVersion: {
+      id: 'version-123',
+      type: 'appStoreVersions',
+      attributes: { versionString: '2.3.0', appVersionState: 'PREPARE_FOR_SUBMISSION' },
+    },
+    versionLocalizations: [],
+    reviewDetail: null,
+  };
+  const plan = buildSyncPlan({
+    state,
+    desired,
+    versionString: '2.3.0',
+    desiredAppInfoLocales: desired.appInfo.locales,
+    desiredVersionLocales: desired.version.locales,
+  });
+  const calls = [];
+  const nextLocalizationsPath = 'https://api.appstoreconnect.apple.com/v1/appStoreVersions/version-123/appStoreVersionLocalizations?cursor=next';
+  const request = async (method, apiPath, body = null) => {
+    calls.push({ method, apiPath, body });
+    if (method === 'POST' && apiPath === '/appInfoLocalizations') return { data: { id: 'app-info-loc-tr' } };
+    if (method === 'GET' && apiPath === '/appStoreVersions/version-123/appStoreVersionLocalizations?limit=200') {
+      return {
+        data: [
+          {
+            id: 'version-loc-en-us',
+            type: 'appStoreVersionLocalizations',
+            attributes: { locale: 'en-US', promotionalText: 'Existing promo' },
+          },
+        ],
+        links: { next: nextLocalizationsPath },
+      };
+    }
+    if (method === 'GET' && apiPath === nextLocalizationsPath) {
+      return {
+        data: [
+          {
+            id: 'version-loc-tr',
+            type: 'appStoreVersionLocalizations',
+            attributes: {
+              locale: 'tr',
+              promotionalText: 'Old promo',
+              description: 'Old description',
+              whatsNew: '+ Old',
+              keywords: 'old',
+            },
+          },
+        ],
+      };
+    }
+    if (method === 'PATCH' && apiPath === '/appStoreVersionLocalizations/version-loc-tr') return { data: { id: 'version-loc-tr' } };
+    throw new Error(`Unexpected call ${method} ${apiPath}`);
+  };
+
+  // When
+  const result = await applySyncPlan(request, plan);
+
+  // Then
+  assert.deepEqual(result.updatedAppInfo, ['tr:create']);
+  assert.deepEqual(result.updatedVersionLocalizations, ['tr:update']);
+  assert.deepEqual(calls.map((call) => `${call.method} ${call.apiPath}`), [
+    'POST /appInfoLocalizations',
+    'GET /appStoreVersions/version-123/appStoreVersionLocalizations?limit=200',
+    `GET ${nextLocalizationsPath}`,
+    'PATCH /appStoreVersionLocalizations/version-loc-tr',
+  ]);
+});
+
+test('given a secret appears in an ASC error body, when redacting secrets, then password values are removed', () => {
+  // Given
+  const errorBody = '{"errors":[{"detail":"demoAccountPassword new-secret rejected"}],"demoAccountPassword":"new-secret"}';
+
+  // When
+  const redacted = redactSecrets(errorBody);
+
+  // Then
+  assert.doesNotMatch(redacted, /new-secret/);
+  assert.match(redacted, /<redacted>/);
+});
+
+test('given WatchCloud sheet rows with URL columns and reviewer notes, when mapping to desired JSON, then localized fields are extracted', () => {
+  // Given
+  const rows = [
+    ['2.3.0 watchOS', 'Name', 'Subtitle', 'Promotional Text', 'Description', "What's new", 'Keywords', 'supportUrl', 'marketingUrl'],
+    ['English US', 'WatchCloud', 'Music on your watch', 'Promo', 'Description', '+ Notes', 'music,watch', 'https://example.com/support', 'https://example.com'],
+    ['Spanish ES', 'WatchCloud', 'Musica en tu reloj', 'Promo ES', 'Descripcion', '+ Notas', 'musica,reloj', '', ''],
+    [],
+    ['Reviewer Notes'],
+    ['Use the demo account.'],
+  ];
+
+  // When
+  const desired = desiredMetadataFromSheetRows(rows);
+
+  // Then
+  assert.equal(desired.version.versionString, '2.3.0');
+  assert.equal(desired.appInfo.locales['en-US'].subtitle, 'Music on your watch');
+  assert.equal(desired.version.locales['en-US'].supportUrl, 'https://example.com/support');
+  assert.equal(desired.version.locales['es-ES'].whatsNew, '+ Notas');
+  assert.equal(desired.review.notes, 'Use the demo account.');
+});
+
+test('given WatchCloud display labels for new locales, when mapping rows, then app info and version locales use exact ASC locale codes', () => {
+  // Given
+  const rows = [
+    ['2.3.0 watchOS', 'Name', 'Subtitle', 'Promotional Text', 'Description', "What's new", 'Keywords'],
+    ['French (Canada) 🇨🇦', 'WatchCloud', 'SoundCloud sur Apple Watch', 'Promo FR CA', 'Description FR CA', '+ Notes FR CA', 'soundcloud,musique'],
+    ['Arabic (SA) 🇸🇦', 'WatchCloud', 'SoundCloud على Apple Watch', 'Promo AR', 'Description AR', '+ Notes AR', 'soundcloud,موسيقى'],
+    ['Vietnamese 🇻🇳', 'WatchCloud', 'SoundCloud trên Apple Watch', 'Promo VI', 'Description VI', '+ Notes VI', 'soundcloud,nhạc'],
+    ['Hindi 🇮🇳', 'WatchCloud', 'Apple Watch पर SoundCloud', 'Promo HI', 'Description HI', '+ Notes HI', 'soundcloud,संगीत'],
+    ['Indonesian 🇮🇩', 'WatchCloud', 'SoundCloud di Apple Watch', 'Promo ID', 'Description ID', '+ Notes ID', 'soundcloud,musik'],
+    ['Malay (MY) 🇲🇾', 'WatchCloud', 'SoundCloud di Apple Watch', 'Promo MS', 'Description MS', '+ Notes MS', 'soundcloud,muzik'],
+    ['Turkish 🇹🇷', 'WatchCloud', 'SoundCloud saatinizde', 'Promo TR', 'Description TR', '+ Notes TR', 'soundcloud,müzik'],
+  ];
+
+  // When
+  const desired = desiredMetadataFromSheetRows(rows);
+
+  // Then
+  assert.deepEqual(Object.keys(desired.appInfo.locales).sort(), ['ar-SA', 'fr-CA', 'hi', 'id', 'ms', 'tr', 'vi']);
+  assert.equal(desired.appInfo.locales['fr-CA'].name, 'WatchCloud');
+  assert.equal(desired.appInfo.locales['fr-CA'].subtitle, 'SoundCloud sur Apple Watch');
+  assert.equal(desired.version.locales['fr-CA'].promotionalText, 'Promo FR CA');
+  assert.equal(desired.appInfo.locales['ar-SA'].subtitle, 'SoundCloud على Apple Watch');
+  assert.equal(desired.appInfo.locales.vi.subtitle, 'SoundCloud trên Apple Watch');
+  assert.equal(desired.appInfo.locales.hi.subtitle, 'Apple Watch पर SoundCloud');
+  assert.equal(desired.appInfo.locales.id.subtitle, 'SoundCloud di Apple Watch');
+  assert.equal(desired.appInfo.locales.ms.subtitle, 'SoundCloud di Apple Watch');
+  assert.equal(desired.appInfo.locales.tr.subtitle, 'SoundCloud saatinizde');
+});
+
+test('given a sheet row with an unknown display label, when mapping to desired JSON, then locale inference fails clearly', () => {
+  // Given
+  const rows = [
+    ['2.3.0', 'Name'],
+    ['Unknown Language', 'WatchCloud'],
+  ];
+
+  // When
+  const mapRows = () => desiredMetadataFromSheetRows(rows);
+
+  // Then
+  assert.throws(mapRows, /Cannot infer ASC locale/);
 });

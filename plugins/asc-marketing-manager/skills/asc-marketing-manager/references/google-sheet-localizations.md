@@ -14,7 +14,7 @@ before running the ASC script.
 3. If `ASC_SHEET_ID` is missing, empty, or points to a missing file, create a native Google Sheets
    spreadsheet through the connector.
 4. Name a newly created spreadsheet after the app if known, using the pattern:
-   `<App Name> strings`.
+   `<App Name> strings 🌎🌍🌏`.
 5. Create or rename tabs so the spreadsheet has:
    - `Pages` as the first tab
    - one version tab named from `ASC_SHEET_NAME`; if omitted, use the confirmed target version
@@ -32,7 +32,7 @@ review the localization rows first.
 
 When creating the sheet with the Google Sheets connector:
 
-1. Create a native Google Sheets file with title `<App Name> strings`.
+1. Create a native Google Sheets file with title `<App Name> strings 🌎🌍🌏`.
 2. Read spreadsheet metadata to get the default sheet ID.
 3. Batch update the spreadsheet:
    - rename the default sheet to the version tab name
@@ -43,7 +43,8 @@ When creating the sheet with the Google Sheets connector:
    - freeze and format the first row of the version tab
    - format language labels in column `A`
    - format the `Reviewer Notes` label row
-4. Re-read metadata and `A1:G12` from the version tab to verify tab names, headers, and seed rows.
+4. Re-read metadata and the populated header-driven range from the version tab to verify tab names,
+   headers, seed rows, and any optional URL columns.
 
 If the connector supports duplicating an existing WatchCloud-style template sheet and the user
 points to one explicitly, duplicating that sheet is acceptable. Otherwise create from the seed rows
@@ -53,7 +54,7 @@ above so this standalone skill does not depend on a private template.
 
 New localization sheets should follow the shape of the WatchCloud spreadsheet:
 
-- Spreadsheet title: `<App Name> strings`
+- Spreadsheet title: `<App Name> strings 🌎🌍🌏`
 - Tab 1: `Pages`
 - Tab 2: version tab, usually the App Store version string such as `2.3.0`
 - Version tab row 1:
@@ -88,13 +89,28 @@ match the app's supported App Store Connect localizations.
 | Display label | ASC locale |
 | --- | --- |
 | English 🇺🇸 | `en-US` |
+| English (U.K.) 🇬🇧 | `en-GB` |
 | Dutch 🇳🇱 | `nl-NL` |
 | French 🇫🇷 | `fr-FR` |
+| French (Canada) 🇨🇦 | `fr-CA` |
 | German 🇩🇪 | `de-DE` |
+| Italian 🇮🇹 | `it` |
 | Japanese 🇯🇵 | `ja` |
 | Korean 🇰🇷 | `ko` |
-| Spanish 🇪🇸 | `es-ES` |
 | Portuguese 🇧🇷 | `pt-BR` |
+| Portuguese (Portugal) 🇵🇹 | `pt-PT` |
+| Spanish (Mexico) 🇲🇽 | `es-MX` |
+| Spanish (Spain) 🇪🇸 | `es-ES` |
+| Russian 🇷🇺 | `ru` |
+| Swedish 🇸🇪 | `sv` |
+| Polish 🇵🇱 | `pl` |
+| Arabic (SA) 🇸🇦 | `ar-SA` |
+| Hebrew 🇮🇱 | `he` |
+| Vietnamese 🇻🇳 | `vi` |
+| Hindi 🇮🇳 | `hi` |
+| Indonesian 🇮🇩 | `id` |
+| Malay (MY) 🇲🇾 | `ms` |
+| Turkish 🇹🇷 | `tr` |
 
 These are just the languages supported by WatchCloud, confirm by checking the iOS project files 
 to see which languages are supported or check with the user. 
@@ -129,11 +145,40 @@ The exact visual styling is less important than preserving the column order and 
 
 ## Desired JSON Extraction
 
+The dependency-free mapper in `lib/sheet-mapper.mjs` converts a 2D sheet range into desired JSON.
+Use it after reading values through the Google Sheets connector so the WatchCloud mapping stays
+consistent across agent runs.
+
 1. Read metadata first and use the exact visible version tab name.
 2. Read the bounded table range from `A1` through the last populated copy column.
 3. Stop localization parsing at the first blank row or the `Reviewer Notes` row.
 4. Map rows with nonblank copy fields into `appInfo.locales` and `version.locales`.
 5. Map the row after `Reviewer Notes` into `review.notes` when it is nonblank.
-6. Validate the resulting desired JSON with `parseDesiredMetadata` by running a dry-run.
+6. Validate local field limits before network calls, especially `Keywords`, which ASC limits to
+   100 UTF-8 bytes rather than 100 visible characters. Cyrillic, CJK, emoji, and accented text can
+   exceed the byte limit sooner than expected; trim lower-value terms and re-write the sheet.
+7. Validate the resulting desired JSON with `parseDesiredMetadata` by running a dry-run.
+
+If the user manually edits the sheet after a desired JSON file or dry-run was created, discard the
+old JSON, re-read the exact row from the sheet, rerun the mapper, regenerate `/private/tmp` JSON,
+and rerun dry-run. The sheet is the source of truth.
+
+When adding a new locale to an existing app version, prefer a version-locales-only JSON for the
+first fallback apply only after a full desired-state dry-run/apply shows app-level `name`/`subtitle`
+is blocked. New localization rows should populate `Name` and `Subtitle`; usually `Name` matches the
+primary English localization, while `Subtitle` is localized. App Info localizations are separate ASC
+resources and may be blocked in states where version localizations can still be created or updated.
+When that happens, report the app-info block explicitly and rerun a version-locales-only dry-run/apply
+so allowed version metadata can still sync.
+
+Do not put Apple device names in app `Name` or `Subtitle`; App Review can reject terms such as
+`iPhone`, `iPad`, `Apple Watch`, `Apple TV`, `Apple Vision`, or `Vision Pro` in these fields. Use
+generic terms like phone/watch or localized equivalents. Longer version metadata can still mention
+platform requirements when appropriate.
+
+For right-to-left locales such as Arabic and Hebrew, avoid starting subtitles, promotional text,
+descriptions, headings, or bullet lines with Latin brand/platform terms such as `WatchCloud`,
+`SoundCloud`, `Apple Watch`, or `Quick Actions`. ASC text areas infer base direction from the first
+strong character, so start each paragraph or bullet with localized RTL wording where possible.
 
 Keep desired JSON in `/private/tmp` and do not commit unreleased marketing copy.

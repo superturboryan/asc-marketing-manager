@@ -149,7 +149,8 @@ ASC_SHEET_NAME=<SHEET_TAB_NAME>
 ```
 
 Keep the target App Store version out of shared credential files. Provide it with `--version` or
-`version.versionString` in desired JSON.
+`version.versionString` in desired JSON. Keep `ASC_PLATFORM` set so the sync targets the intended
+platform when multiple App Store versions share the same version string.
 
 Secure it:
 

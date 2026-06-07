@@ -52,11 +52,15 @@ The ASC sync script accepts desired-state JSON with App Store Connect text metad
 
 ## Fields
 
-- `appInfo.locales`: optional object keyed by ASC locale code for `name` and `subtitle`.
+- `appInfo.locales`: optional object keyed by ASC locale code for `name` and `subtitle`. These
+  are App Info localization fields, not version-localization fields. ASC may reject them in states
+  where version metadata is still editable; if that happens, omit `appInfo.locales` and retry a
+  version-locales-only dry-run/apply.
 - `version.locales`: optional object keyed by ASC locale code for `promotionalText`, `description`, `keywords`, `supportUrl`, `marketingUrl`, and `whatsNew`.
 - `version.versionString`: optional only when `--version` is provided. Required with
   `--ensure-version` when creating a missing version unless `--version` is provided.
-- `version.platform`: optional for existing versions; defaults to `ASC_PLATFORM` or `IOS` when creating a version.
+- `version.platform`: optional for existing versions, but recommended when the same version string
+  exists on multiple platforms; defaults to `ASC_PLATFORM` or `IOS` when creating a version.
 - `version.copyright`: required for `--ensure-version --apply` unless `ASC_COPYRIGHT` is set.
 - `version.releaseType`: optional; one of `MANUAL`, `AFTER_APPROVAL`, or `SCHEDULED`; defaults to `MANUAL` when creating a version.
 - `version.earliestReleaseDate`: optional ISO date-time string for scheduled release.
@@ -89,9 +93,10 @@ Legacy `locales` are treated as `version.locales`.
 - `promotionalText`: max 170 Unicode code points.
 - `description`: max 4000 Unicode code points.
 - `whatsNew`: max 4000 Unicode code points.
-- `keywords`: max 100 UTF-8 bytes.
+- `keywords`: max 100 UTF-8 bytes. Count bytes, not visible characters; non-ASCII keywords can
+  exceed the limit quickly.
 - `review.notes`: max 4000 UTF-8 bytes.
-- `supportUrl` and `marketingUrl`: valid URLs with a protocol.
+- `supportUrl` and `marketingUrl`: valid HTTPS URLs.
 
 All provided string fields must be nonblank after trailing whitespace normalization.
 

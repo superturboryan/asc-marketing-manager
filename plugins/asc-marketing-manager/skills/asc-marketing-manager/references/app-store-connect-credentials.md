@@ -38,8 +38,10 @@ ASC_SHEET_NAME=<SHEET_TAB_NAME>
 ```
 
 Keep the target App Store version out of shared credential files. Provide it with `--version` or
-`version.versionString` in desired JSON. `ASC_PLATFORM` and `ASC_COPYRIGHT` are only needed when
-using `--ensure-version` to create a missing App Store version.
+`version.versionString` in desired JSON. `ASC_PLATFORM` is recommended for every sync so version
+lookup cannot accidentally match the same version string on another platform. `ASC_PLATFORM` and
+`ASC_COPYRIGHT` are required when using `--ensure-version` to create a missing App Store version,
+unless equivalent values are provided in desired JSON.
 
 Secure it:
 

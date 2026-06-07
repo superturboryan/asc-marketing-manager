@@ -15,11 +15,25 @@ Use this skill to update App Store Connect text metadata with a dry-run-first wo
    - tab from `ASC_SHEET_NAME`; if omitted, use the confirmed target version
    - if `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, create a native Google
      Sheet with the Google Sheets connector before asking the user to fill copy
+   - after reading sheet values through the connector, use the dependency-free mapper in
+     `lib/sheet-mapper.mjs` to convert the 2D range into desired JSON
    - new sheets should follow the WatchCloud strings layout: a `Pages` tab plus one version tab
      with headers `Name`, `Subtitle`, `Promotional Text`, `Description`, `What's new`, `Keywords`
 3. Build a transient desired-state JSON in `/private/tmp`.
+   - If the sheet is edited manually after JSON generation or after a dry-run, re-read the sheet,
+     rerun the mapper, and regenerate JSON before another dry-run or apply.
+   - For newly added locales, include both `appInfo.locales` (`name`, `subtitle`) and
+     `version.locales` in the first desired JSON. Default `name` from the primary English row
+     unless the app intentionally localizes its brand/title; localize the `subtitle`.
+   - App `name` and `subtitle` must not include Apple device names such as `iPhone`, `iPad`,
+     `Apple Watch`, `Apple TV`, `Apple Vision`, or `Vision Pro`; use generic wording like
+     `phone`, `watch`, or localized equivalents.
+   - If App Store Connect rejects app-info create/update because of app state, report the blocked
+     `name`/`subtitle` fields explicitly, then retry/apply a version-locales-only JSON so
+     promotional text, description, what's new, and keywords can still sync.
 4. Run the bundled script with `--dry-run`.
-5. Require explicit user confirmation before running `--apply`.
+5. Require explicit user confirmation before running `--apply`. If the user already gave explicit
+   apply intent before the dry-run, a clean dry-run immediately before apply is sufficient.
 6. After apply, rely on the script's re-fetch verification before reporting success.
 
 If the user's prompt does not specify which App Store version to edit or create, stop and ask for
@@ -56,6 +70,11 @@ The script syncs App Store Connect only. It does not read or create Google Sheet
 Read `references/desired-json-schema.md` before creating desired-state JSON by hand. The current
 nested shape separates `appInfo.locales`, `version.locales`, version attributes, and `review`
 fields. The old top-level `locales` shape remains supported for `promotionalText` and `whatsNew`.
+
+`appInfo.locales` (`name`, `subtitle`) and `version.locales` (promotional text, description,
+keywords, What's New, URLs) are separate ASC resources. If app-level `name` or `subtitle` changes
+are rejected due to App Store Connect state, rerun a version-locales-only dry-run/apply so allowed
+version metadata can still sync.
 
 ## Credentials
 
