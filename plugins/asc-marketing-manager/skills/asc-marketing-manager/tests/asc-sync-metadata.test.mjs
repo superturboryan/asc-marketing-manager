@@ -49,7 +49,7 @@ const validNestedDesired = () => ({
   appInfo: {
     locales: {
       'en-US': {
-        name: 'WatchCloud',
+        name: 'Example App',
         subtitle: 'Music on your watch',
       },
     },
@@ -143,7 +143,7 @@ test('given nested desired metadata, when parsing it, then app info, version, an
   const desired = parseDesiredObject(desiredJson);
 
   // Then
-  assert.equal(desired.appInfo.locales['en-US'].name, 'WatchCloud');
+  assert.equal(desired.appInfo.locales['en-US'].name, 'Example App');
   assert.equal(desired.version.versionString, '2.3.0');
   assert.equal(desired.review.demoAccountRequired, true);
 });
@@ -252,7 +252,7 @@ test('given desired metadata that exceeds field limits or has a bad URL, when va
     },
     {
       name: 'app info control characters',
-      given: { appInfo: { locales: { ja: { name: 'WatchCloud:\nSoundCloudプレーヤー' } } } },
+      given: { appInfo: { locales: { ja: { name: 'Example App:\nSoundCloudプレーヤー' } } } },
       then: /control characters/,
     },
     {
@@ -347,18 +347,18 @@ test('given app info localizations with one changed locale and one new locale, w
       id: 'app-info-en-us',
       attributes: {
         locale: 'en-US',
-        name: 'WatchCloud',
+        name: 'Example App',
         subtitle: 'Old subtitle',
       },
     },
   ];
   const desiredLocales = {
     'en-US': {
-      name: 'WatchCloud',
+      name: 'Example App',
       subtitle: 'Music on your watch',
     },
     'es-ES': {
-      name: 'WatchCloud',
+      name: 'Example App',
       subtitle: 'Musica en tu reloj',
     },
   };
@@ -598,7 +598,7 @@ test('given ASC API responses for app info, version, localizations, and review, 
       data: [
         {
           id: 'app-info-loc-en-us',
-          attributes: { locale: 'en-US', name: 'WatchCloud', subtitle: 'Music' },
+          attributes: { locale: 'en-US', name: 'Example App', subtitle: 'Music' },
         },
       ],
     }),
@@ -658,7 +658,7 @@ test('given ASC returns live and editable app info resources, when loading state
       data: [
         {
           id: 'app-info-loc-en-us',
-          attributes: { locale: 'en-US', name: 'WatchCloud', subtitle: 'Music' },
+          attributes: { locale: 'en-US', name: 'Example App', subtitle: 'Music' },
         },
       ],
     }),
@@ -894,7 +894,7 @@ ASC_PLATFORM=IOS
             type: 'appInfoLocalizations',
             attributes: verifying
               ? { locale: 'en-US', ...desired.appInfo.locales['en-US'] }
-              : { locale: 'en-US', name: 'WatchCloud', subtitle: 'Old subtitle' },
+              : { locale: 'en-US', name: 'Example App', subtitle: 'Old subtitle' },
           },
         ],
       };
@@ -977,7 +977,7 @@ test('given app info create auto-creates a version localization, when applying s
     appInfo: {
       locales: {
         tr: {
-          name: 'WatchCloud: SoundCloud Player',
+          name: 'Example App: SoundCloud Player',
           subtitle: 'SoundCloud saatinizde',
         },
       },
@@ -1077,12 +1077,12 @@ test('given a secret appears in an ASC error body, when redacting secrets, then 
   assert.match(redacted, /<redacted>/);
 });
 
-test('given WatchCloud sheet rows with URL columns and reviewer notes, when mapping to desired JSON, then localized fields are extracted', () => {
+test('given default layout sheet rows with URL columns and reviewer notes, when mapping to desired JSON, then localized fields are extracted', () => {
   // Given
   const rows = [
     ['2.3.0 watchOS', 'Name', 'Subtitle', 'Promotional Text', 'Description', "What's new", 'Keywords', 'supportUrl', 'marketingUrl'],
-    ['English US', 'WatchCloud', 'Music on your watch', 'Promo', 'Description', '+ Notes', 'music,watch', 'https://example.com/support', 'https://example.com'],
-    ['Spanish ES', 'WatchCloud', 'Musica en tu reloj', 'Promo ES', 'Descripcion', '+ Notas', 'musica,reloj', '', ''],
+    ['English US', 'Example App', 'Music on your watch', 'Promo', 'Description', '+ Notes', 'music,watch', 'https://example.com/support', 'https://example.com'],
+    ['Spanish ES', 'Example App', 'Musica en tu reloj', 'Promo ES', 'Descripcion', '+ Notas', 'musica,reloj', '', ''],
     [],
     ['Reviewer Notes'],
     ['Use the demo account.'],
@@ -1099,17 +1099,17 @@ test('given WatchCloud sheet rows with URL columns and reviewer notes, when mapp
   assert.equal(desired.review.notes, 'Use the demo account.');
 });
 
-test('given WatchCloud display labels for new locales, when mapping rows, then app info and version locales use exact ASC locale codes', () => {
+test('given display labels for new locales, when mapping rows, then app info and version locales use exact ASC locale codes', () => {
   // Given
   const rows = [
     ['2.3.0 watchOS', 'Name', 'Subtitle', 'Promotional Text', 'Description', "What's new", 'Keywords'],
-    ['French (Canada) 🇨🇦', 'WatchCloud', 'SoundCloud sur Apple Watch', 'Promo FR CA', 'Description FR CA', '+ Notes FR CA', 'soundcloud,musique'],
-    ['Arabic (SA) 🇸🇦', 'WatchCloud', 'SoundCloud على Apple Watch', 'Promo AR', 'Description AR', '+ Notes AR', 'soundcloud,موسيقى'],
-    ['Vietnamese 🇻🇳', 'WatchCloud', 'SoundCloud trên Apple Watch', 'Promo VI', 'Description VI', '+ Notes VI', 'soundcloud,nhạc'],
-    ['Hindi 🇮🇳', 'WatchCloud', 'Apple Watch पर SoundCloud', 'Promo HI', 'Description HI', '+ Notes HI', 'soundcloud,संगीत'],
-    ['Indonesian 🇮🇩', 'WatchCloud', 'SoundCloud di Apple Watch', 'Promo ID', 'Description ID', '+ Notes ID', 'soundcloud,musik'],
-    ['Malay (MY) 🇲🇾', 'WatchCloud', 'SoundCloud di Apple Watch', 'Promo MS', 'Description MS', '+ Notes MS', 'soundcloud,muzik'],
-    ['Turkish 🇹🇷', 'WatchCloud', 'SoundCloud saatinizde', 'Promo TR', 'Description TR', '+ Notes TR', 'soundcloud,müzik'],
+    ['French (Canada) 🇨🇦', 'Example App', 'SoundCloud sur Apple Watch', 'Promo FR CA', 'Description FR CA', '+ Notes FR CA', 'soundcloud,musique'],
+    ['Arabic (SA) 🇸🇦', 'Example App', 'SoundCloud على Apple Watch', 'Promo AR', 'Description AR', '+ Notes AR', 'soundcloud,موسيقى'],
+    ['Vietnamese 🇻🇳', 'Example App', 'SoundCloud trên Apple Watch', 'Promo VI', 'Description VI', '+ Notes VI', 'soundcloud,nhạc'],
+    ['Hindi 🇮🇳', 'Example App', 'Apple Watch पर SoundCloud', 'Promo HI', 'Description HI', '+ Notes HI', 'soundcloud,संगीत'],
+    ['Indonesian 🇮🇩', 'Example App', 'SoundCloud di Apple Watch', 'Promo ID', 'Description ID', '+ Notes ID', 'soundcloud,musik'],
+    ['Malay (MY) 🇲🇾', 'Example App', 'SoundCloud di Apple Watch', 'Promo MS', 'Description MS', '+ Notes MS', 'soundcloud,muzik'],
+    ['Turkish 🇹🇷', 'Example App', 'SoundCloud saatinizde', 'Promo TR', 'Description TR', '+ Notes TR', 'soundcloud,müzik'],
   ];
 
   // When
@@ -1117,7 +1117,7 @@ test('given WatchCloud display labels for new locales, when mapping rows, then a
 
   // Then
   assert.deepEqual(Object.keys(desired.appInfo.locales).sort(), ['ar-SA', 'fr-CA', 'hi', 'id', 'ms', 'tr', 'vi']);
-  assert.equal(desired.appInfo.locales['fr-CA'].name, 'WatchCloud');
+  assert.equal(desired.appInfo.locales['fr-CA'].name, 'Example App');
   assert.equal(desired.appInfo.locales['fr-CA'].subtitle, 'SoundCloud sur Apple Watch');
   assert.equal(desired.version.locales['fr-CA'].promotionalText, 'Promo FR CA');
   assert.equal(desired.appInfo.locales['ar-SA'].subtitle, 'SoundCloud على Apple Watch');
@@ -1132,7 +1132,7 @@ test('given a sheet row with an unknown display label, when mapping to desired J
   // Given
   const rows = [
     ['2.3.0', 'Name'],
-    ['Unknown Language', 'WatchCloud'],
+    ['Unknown Language', 'Example App'],
   ];
 
   // When

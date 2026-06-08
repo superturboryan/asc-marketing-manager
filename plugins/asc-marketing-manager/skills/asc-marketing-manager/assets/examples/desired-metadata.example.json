@@ -2,11 +2,11 @@
   "appInfo": {
     "locales": {
       "en-US": {
-        "name": "WatchCloud",
+        "name": "Example App",
         "subtitle": "Music on your watch"
       },
       "es-ES": {
-        "name": "WatchCloud",
+        "name": "Example App",
         "subtitle": "Musica en tu reloj"
       }
     },
@@ -23,17 +23,17 @@
     "usesIdfa": false,
     "locales": {
       "en-US": {
-        "promotionalText": "SoundCloud on your watch. Phone-free listening.",
-        "description": "WatchCloud is a SoundCloud player designed for watchOS and your wrist.",
-        "keywords": "soundcloud,watch,music,streaming",
+        "promotionalText": "Music on your watch. Phone-free listening.",
+        "description": "Example App helps listeners manage audio from their watch.",
+        "keywords": "music,watch,audio,streaming",
         "supportUrl": "https://example.com/support",
         "marketingUrl": "https://example.com",
         "whatsNew": "+ Updated for the latest OS\n+ Bug fixes and stability improvements"
       },
       "es-ES": {
-        "promotionalText": "SoundCloud en tu reloj. Escucha sin telefono.",
-        "description": "WatchCloud es un reproductor de SoundCloud disenado para watchOS y tu muneca.",
-        "keywords": "soundcloud,reloj,musica,streaming",
+        "promotionalText": "Musica en tu reloj. Escucha sin telefono.",
+        "description": "Example App ayuda a gestionar audio desde tu reloj.",
+        "keywords": "musica,reloj,audio,streaming",
         "supportUrl": "https://example.com/support",
         "marketingUrl": "https://example.com",
         "whatsNew": "+ Actualizada para el ultimo sistema operativo\n+ Correccion de errores y mejoras de estabilidad"

@@ -116,7 +116,7 @@ The scripts only talk to App Store Connect and local files. They do not read or 
 directly. The skill/agent should read Google Sheets through the Google Sheets connector, then write
 transient desired-state JSON to `/private/tmp`.
 
-If `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, the skill can create a native Google Sheet first. New sheets should follow the WatchCloud strings format documented in `plugins/asc-marketing-manager/skills/asc-marketing-manager/references/google-sheet-localizations.md`:
+If `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, the skill can create a native Google Sheet first. New sheets should follow the default localization format documented in `plugins/asc-marketing-manager/skills/asc-marketing-manager/references/google-sheet-localizations.md`:
 
 - spreadsheet title pattern: `<App Name> strings 🌎🌍🌏`
 - `Pages` tab first
@@ -129,12 +129,12 @@ After creating a blank sheet, do not apply ASC changes until the user fills and 
 
 Expected sheet mapping:
 
-- WatchCloud-style sheets use column `A` for language label, `B` for `Name`, `C` for `Subtitle`,
+- Default localization sheets use column `A` for language label, `B` for `Name`, `C` for `Subtitle`,
   `D` for `Promotional Text`, `E` for `Description`, `F` for `What's new`, and `G` for `Keywords`.
 - Generic sheets may use named headers matching desired JSON fields:
   `locale`, `name`, `subtitle`, `promotionalText`, `description`, `keywords`,
   `supportUrl`, `marketingUrl`, `whatsNew`
-- If a WatchCloud-style sheet needs localized URL overrides, add optional columns named exactly
+- If a default localization sheet needs localized URL overrides, add optional columns named exactly
   `supportUrl` and `marketingUrl` after `Keywords`.
 
 Use `ASC_SHEET_NAME` from the env file for sheet routing. If omitted, use the confirmed target

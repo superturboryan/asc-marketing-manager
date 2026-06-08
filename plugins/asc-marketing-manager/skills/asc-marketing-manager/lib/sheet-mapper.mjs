@@ -57,7 +57,7 @@ const DISPLAY_LABEL_LOCALES = new Map([
   ['turkish', 'tr'],
 ]);
 
-const WATCHCLOUD_HEADER_FIELDS = new Map([
+const DEFAULT_LAYOUT_HEADER_FIELDS = new Map([
   ['name', { section: 'appInfo', field: 'name' }],
   ['subtitle', { section: 'appInfo', field: 'subtitle' }],
   ['promotional text', { section: 'version', field: 'promotionalText' }],
@@ -75,13 +75,13 @@ export function desiredMetadataFromSheetRows(rows, { versionString = null, sheet
 
   return hasGenericLocaleHeader
     ? desiredFromGenericRows(rows, { versionString, sheetName })
-    : desiredFromWatchCloudRows(rows, { versionString, sheetName });
+    : desiredFromDefaultLayoutRows(rows, { versionString, sheetName });
 }
 
-function desiredFromWatchCloudRows(rows, { versionString, sheetName }) {
+function desiredFromDefaultLayoutRows(rows, { versionString, sheetName }) {
   const headers = rows[0].map((header) => normalizeHeader(header));
   const desired = emptyDesired(versionString ?? inferVersionString(rows[0][0]) ?? sheetName);
-  const columnMappings = headers.map((header) => WATCHCLOUD_HEADER_FIELDS.get(header) ?? null);
+  const columnMappings = headers.map((header) => DEFAULT_LAYOUT_HEADER_FIELDS.get(header) ?? null);
   const reviewerNotesRowIndex = rows.findIndex((row) => normalizeHeader(row[0]) === 'reviewer notes');
 
   const lastLocalizationRow = reviewerNotesRowIndex === -1 ? rows.length : reviewerNotesRowIndex;

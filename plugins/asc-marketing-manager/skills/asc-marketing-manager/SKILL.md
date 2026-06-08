@@ -18,7 +18,7 @@ workflow.
      Sheet with the Google Sheets connector before asking the user to fill copy
    - after reading sheet values through the connector, use the dependency-free mapper in
      `lib/sheet-mapper.mjs` to convert the 2D range into desired JSON
-   - new sheets should follow the WatchCloud strings layout: a `Pages` tab plus one version tab
+   - new sheets should follow the default localization layout: a `Pages` tab plus one version tab
      with headers `Name`, `Subtitle`, `Promotional Text`, `Description`, `What's new`, `Keywords`
 3. Build a transient desired-state JSON in `/private/tmp`.
    - If the sheet is edited manually after JSON generation or after a dry-run, re-read the sheet,
