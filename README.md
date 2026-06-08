@@ -1,8 +1,6 @@
-# ASC Marketing Manager
+<img src="plugins/asc-marketing-manager/assets/icon.svg" alt="ASC Marketing Manager icon" width="88" align="right">
 
-<p align="center">
-  <img src="plugins/asc-marketing-manager/assets/icon.svg" alt="ASC Marketing Manager icon" width="112">
-</p>
+# ASC Marketing Manager
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![skills.sh](https://skills.sh/b/superturboryan/asc-marketing-manager)](https://skills.sh/superturboryan/asc-marketing-manager/asc-marketing-manager)
