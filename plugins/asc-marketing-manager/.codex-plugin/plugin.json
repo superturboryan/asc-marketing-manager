@@ -1,7 +1,7 @@
 {
   "name": "asc-marketing-manager",
   "version": "0.1.0",
-  "description": "API-aware workflows for dry-running and syncing localized App Store Connect text metadata.",
+  "description": "API-aware workflows for dry-running and syncing localized App Store Connect text metadata and screenshots.",
   "author": {
     "name": "SuperTurboRyan",
     "url": "https://github.com/superturboryan"
@@ -16,19 +16,22 @@
     "ios",
     "localization",
     "metadata",
+    "screenshots",
+    "assets",
     "app-review",
     "release-notes"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "ASC Marketing Manager",
-    "shortDescription": "Dry-run and sync localized App Store Connect metadata with API-aware safety.",
-    "longDescription": "ASC Marketing Manager gives Codex focused knowledge of the App Store Connect API for localized text metadata. It turns Google Sheets or desired-state JSON into a validated dry run, can create a missing editable app version when requested, and applies only explicitly reviewed changes for names, subtitles, descriptions, keywords, URLs, What's New, promotional text, and App Review fields.",
+    "shortDescription": "Dry-run and sync localized App Store Connect metadata and screenshots with API-aware safety.",
+    "longDescription": "ASC Marketing Manager gives Codex focused knowledge of the App Store Connect API for localized text metadata and screenshot assets. It turns Google Sheets or desired-state JSON into a validated dry run, can create a missing editable app version when requested, and applies only explicitly reviewed changes for names, subtitles, descriptions, keywords, URLs, What's New, promotional text, App Review fields, and localized screenshot sets.",
     "developerName": "SuperTurboRyan",
     "category": "Productivity",
     "capabilities": [
       "App Store Connect API metadata",
       "Localization sheet sync",
+      "Screenshot asset upload",
       "Dry-run review",
       "Editable version setup"
     ],
@@ -36,7 +39,7 @@
     "defaultPrompt": [
       "Compare my localization sheet with App Store Connect before release.",
       "Create a dry run for version 2.3 using my App Store copy sheet.",
-      "Set up an editable App Store version and sync reviewed metadata."
+      "Dry-run replacing my localized screenshot sets from this asset folder."
     ],
     "brandColor": "#0A84FF",
     "composerIcon": "./assets/icon.svg",

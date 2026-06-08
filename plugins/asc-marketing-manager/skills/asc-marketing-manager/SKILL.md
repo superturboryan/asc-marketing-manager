@@ -1,13 +1,14 @@
 ---
 name: asc-marketing-manager
-description: Sync App Store Connect marketing metadata safely, including localized name, subtitle, description, keywords, support URL, marketing URL, What's New, Promotional Text, App Review text fields, and release-version setup from Google Sheets or desired-state JSON. Use when updating localized App Store copy or starting a new editable App Store version.
+description: Sync App Store Connect marketing metadata and localized screenshot assets safely, including localized text fields, App Review fields, release-version setup, and screenshot upload/replacement from local folders. Use when updating App Store copy, uploading screenshots, or starting a new editable App Store version.
 ---
 
 # Workflow
 
-Use this skill to update App Store Connect text metadata with a dry-run-first workflow.
+Use this skill to update App Store Connect text metadata and screenshot assets with a dry-run-first
+workflow.
 
-## Core Workflow
+## Text Metadata Workflow
 
 1. Confirm the target app, version, and credential env file.
 2. If using Google Sheets, read `references/google-sheet-localizations.md` first.
@@ -41,7 +42,29 @@ the target version before reading sheets or running the script. Use `--ensure-ve
 the user wants to start a new editable release. Dry-run reports the version creation; apply creates
 it.
 
-## Script
+## Screenshot Asset Workflow
+
+Use this workflow for App Store screenshots only. App previews, review attachments, build selection,
+submission, phased release, routing coverage, and rating reset remain future scope.
+
+1. Confirm the target app, version, credential env file, and local screenshot asset folder.
+2. Read `references/asset-folder-screenshots.md` before interpreting folder structure.
+3. Run `scripts/asc-sync-assets.mjs` with `--dry-run` first.
+   - The script infers one ASC locale and one screenshot display type from each screenshot path.
+   - Supported shapes include `assets/en-US/APP_IPHONE_67/01-home.png` and
+     `assets/APP_IPHONE_67/en-US/01-home.png`.
+   - Use `--folder-shape locale-first` or `--folder-shape display-first` when the user wants a
+     stricter convention; default `auto` accepts mixed nested folders when each path is unambiguous.
+   - Filenames with leading numbers determine order, for example `01-home.png`, `02-search.png`,
+     `10-settings.png`.
+4. If folder inference is ambiguous, stop and ask the user how locale/display folders should map
+   before applying.
+5. Require explicit user confirmation before running `--apply`. Apply mode replaces each targeted
+   ASC screenshot set with the files found in the matching local folder target.
+6. After apply, rely on the script's upload commit, ordering, and processing verification before
+   reporting success.
+
+## Scripts
 
 Use `scripts/asc-sync-metadata.mjs`.
 
@@ -65,6 +88,24 @@ node scripts/asc-sync-metadata.mjs \
 
 The script syncs App Store Connect only. It does not read or create Google Sheets directly.
 
+Use `scripts/asc-sync-assets.mjs` for screenshots:
+
+```zsh
+node scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
+  --dry-run
+```
+
+```zsh
+node scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
+  --apply
+```
+
 ## Desired JSON
 
 Read `references/desired-json-schema.md` before creating desired-state JSON by hand. The current
@@ -87,8 +128,10 @@ Tell users to follow the least privilege principle for App Store Connect API key
 
 - Always dry-run first.
 - Do not run `--apply` until the user explicitly asks for it after a clean dry-run.
+- Screenshot apply mode replaces targeted ASC screenshot sets; make the destructive replacement
+  explicit when summarizing a dry run.
 - Keep `.env` and `.p8` files outside repos.
 - Do not commit desired JSON if it contains unreleased marketing copy.
 - Do not print review passwords, JWTs, `.p8` contents, or env files containing secrets.
-- Treat screenshot, app preview, build selection, review attachment, submission, phased-release creation,
-  routing coverage, and rating reset as future/planning scope. This script supports text metadata only.
+- Treat app preview, build selection, review attachment, submission, phased-release creation,
+  routing coverage, and rating reset as future/planning scope.

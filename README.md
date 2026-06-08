@@ -3,13 +3,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![skills.sh](https://skills.sh/b/superturboryan/asc-marketing-manager)](https://skills.sh/superturboryan/asc-marketing-manager/asc-marketing-manager)
 ![Node.js 18+](https://img.shields.io/badge/node-18%2B-339933)
-![App Store Connect](https://img.shields.io/badge/App%20Store%20Connect-metadata-0A84FF)
+![App Store Connect](https://img.shields.io/badge/App%20Store%20Connect-metadata%20%2B%20screenshots-0A84FF)
 
-ASC Marketing Manager is a Codex marketplace plugin for safely syncing App Store Connect text metadata.
+ASC Marketing Manager is a Codex marketplace plugin for safely syncing App Store Connect text metadata and localized screenshot assets.
 
 It reads localized marketing copy from Google Sheets or desired-state JSON, runs a dry-run comparison first, and applies only explicitly reviewed App Store Connect changes.
 
-Screenshot and app preview upload support is planned as a later command because asset uploads use a separate App Store Connect workflow.
+It also supports a separate dry-run-first screenshot upload command for replacing localized App Store screenshot sets from local folders. App previews remain future scope.
 
 ## Install In Codex
 
@@ -45,9 +45,10 @@ npx codex-marketplace add superturboryan/asc-marketing-manager --plugins
 
 ## At a Glance
 
-- Dry-run-first App Store Connect sync for localized text metadata.
+- Dry-run-first App Store Connect sync for localized text metadata and screenshots.
 - Installable as a Codex plugin, with a bundled Node script that has no npm dependencies.
 - Supports Google Sheets connector workflows and explicit desired-state JSON.
+- Supports nested screenshot folders with inferred locale, display type, and filename ordering.
 - Keeps credentials outside the repo and redacts sensitive review/demo-account values.
 - Published as an early `0.1.0` pre-release; contributions are welcome.
 
@@ -64,6 +65,7 @@ npx codex-marketplace add superturboryan/asc-marketing-manager --plugins
 - `promotionalText`
 - App Review contact, demo account, and notes text fields
 - starting a new editable App Store version when explicitly requested
+- localized App Store screenshots from local folders
 
 </details>
 
@@ -79,6 +81,9 @@ npx codex-marketplace add superturboryan/asc-marketing-manager --plugins
 - Keeps App Info, App Store Version Localization, App Store Version, and App Review Detail updates separate.
 - Can dry-run and then create a missing App Store version with `--ensure-version`.
 - Re-fetches App Store Connect state and verifies the result after apply.
+- Scans screenshot folders, infers locale/display targets, replaces targeted screenshot sets, uploads
+  screenshot bytes through ASC reservation/upload/commit APIs, reorders screenshots, and verifies
+  processing.
 
 </details>
 
@@ -107,6 +112,55 @@ New sheets follow the WatchCloud strings layout:
 - `Reviewer Notes` section below the localization table
 
 Example CSV templates are in `plugins/asc-marketing-manager/skills/asc-marketing-manager/assets/examples/localization-sheet-template.csv` and `plugins/asc-marketing-manager/skills/asc-marketing-manager/assets/examples/pages-sheet-template.csv`. Full connector creation and extraction rules are in `plugins/asc-marketing-manager/skills/asc-marketing-manager/references/google-sheet-localizations.md`.
+
+</details>
+
+<details open>
+<summary><strong>Screenshot Assets</strong></summary>
+
+Use `asc-sync-assets.mjs` for App Store screenshots. The command supports screenshots only; app
+previews remain future scope.
+
+Example folder:
+
+```text
+AppStoreScreenshots/
+  en-US/
+    APP_IPHONE_67/
+      01-home.png
+      02-search.png
+  APP_IPHONE_67/
+    ja/
+      01-home.png
+      02-search.png
+```
+
+Each screenshot path must contain exactly one locale and one screenshot display type. The default
+folder shape is `auto`, so `locale/display/files` and `display/locale/files` can coexist when each
+file path is unambiguous. Leading filename numbers define the ASC order.
+
+Dry run:
+
+```zsh
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
+  --dry-run
+```
+
+Apply after reviewing a clean dry run:
+
+```zsh
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
+  --apply
+```
+
+Apply mode replaces each targeted ASC screenshot set with the matching local files. Full folder
+rules are in `plugins/asc-marketing-manager/skills/asc-marketing-manager/references/asset-folder-screenshots.md`.
 
 </details>
 
@@ -149,8 +203,9 @@ ASC_SHEET_NAME=<SHEET_TAB_NAME>
 ```
 
 Keep the target App Store version out of shared credential files. Provide it with `--version` or
-`version.versionString` in desired JSON. Keep `ASC_PLATFORM` set so the sync targets the intended
-platform when multiple App Store versions share the same version string.
+`version.versionString` in desired JSON. Screenshot sync uses `--version`. Keep `ASC_PLATFORM` set
+so the sync targets the intended platform when multiple App Store versions share the same version
+string.
 
 Secure it:
 
@@ -236,6 +291,16 @@ node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync
   --dry-run
 ```
 
+Screenshot dry runs use the asset command:
+
+```zsh
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
+  --dry-run
+```
+
 </details>
 
 <details>
@@ -247,6 +312,16 @@ Only apply after reviewing a clean dry-run:
 node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-metadata.mjs \
   --env ~/.appstoreconnect/my-app.env \
   --desired /private/tmp/asc-desired-metadata.json \
+  --apply
+```
+
+For screenshots:
+
+```zsh
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
   --apply
 ```
 
@@ -276,9 +351,10 @@ Good first areas:
 - clearer Google Sheet templates and extraction rules
 - improved dry-run summaries
 - App Store Connect edge cases around editable version state
+- screenshot display-type aliases and validation fixtures
 - documentation for common release-manager workflows
 
-Please keep changes dependency-light, dry-run-first, and careful about credentials. Screenshot and app preview upload support should land as a separate command/workflow because ASC asset uploads use reservation, upload, commit, and reorder APIs.
+Please keep changes dependency-light, dry-run-first, and careful about credentials. App preview upload support should land as a separate command/workflow because ASC video assets have additional validation and processing edge cases.
 
 </details>
 
@@ -293,6 +369,8 @@ Please keep changes dependency-light, dry-run-first, and careful about credentia
 - Blank field rejection.
 - Trailing whitespace normalization because App Store Connect strips trailing whitespace.
 - Secret redaction for credentials and review passwords in summaries.
-- No screenshot, preview, build selection, review attachment, submission, phased-release creation, routing coverage, or rating reset behavior.
+- Screenshot dry runs before replace-set applies.
+- Screenshot folder ambiguity checks for locale/display inference and ordering.
+- No preview, build selection, review attachment, submission, phased-release creation, routing coverage, or rating reset behavior.
 
 </details>

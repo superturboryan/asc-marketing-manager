@@ -116,5 +116,6 @@ Use exact locale codes returned by App Store Connect, for example:
 - `pt-BR`
 - `pt-PT`
 
-The script can create missing App Info and App Store Version Localization rows for desired locales.
-It does not upload screenshots, app previews, review attachments, routing files, or builds.
+The metadata script can create missing App Info and App Store Version Localization rows for desired
+locales. It does not upload assets. Use `scripts/asc-sync-assets.mjs` and
+`references/asset-folder-screenshots.md` for screenshot uploads.

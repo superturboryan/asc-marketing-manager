@@ -2,7 +2,7 @@
 
 ## Project
 
-`asc-marketing-manager` is a Codex marketplace plugin for safely syncing localized App Store Connect marketing metadata.
+`asc-marketing-manager` is a Codex marketplace plugin for safely syncing localized App Store Connect marketing metadata and screenshot assets.
 
 Current local path:
 
@@ -27,15 +27,24 @@ asc-marketing-manager/
       skills/
         asc-marketing-manager/
           SKILL.md
+          lib/
+            asc-sync-core.mjs
+            assets.mjs
+            cli.mjs
+            sheet-mapper.mjs
+            sync-plan.mjs
           scripts/
+            asc-sync-assets.mjs
             asc-sync-metadata.mjs
           tests/
+            asc-sync-assets.test.mjs
             asc-sync-metadata.test.mjs
             fixtures/
               desired-valid.json
               app-store-version-localizations.json
           references/
             desired-json-schema.md
+            asset-folder-screenshots.md
             app-store-connect-credentials.md
             google-sheet-localizations.md
           assets/
@@ -48,7 +57,7 @@ asc-marketing-manager/
 
 ## Current Status
 
-The text metadata expansion package has been implemented and tested.
+The text metadata expansion package and screenshot asset upload package have been implemented and tested.
 
 Verification command:
 
@@ -57,11 +66,11 @@ cd /Users/ryan/Developer/Xcode/asc-marketing-manager
 node --test plugins/asc-marketing-manager/skills/asc-marketing-manager/tests/*.test.mjs
 ```
 
-Last known result: 17 tests passed.
+Last known result: 39 tests passed.
 
 ## Purpose
 
-The skill helps agents sync App Store Connect text metadata, including:
+The skill helps agents sync App Store Connect text metadata and screenshot assets, including:
 
 - localized app name
 - localized subtitle
@@ -73,10 +82,10 @@ The skill helps agents sync App Store Connect text metadata, including:
 - `promotionalText`
 - App Review contact, demo account, and notes text fields
 - explicit creation of a missing editable App Store version with `--ensure-version`
+- localized screenshot upload/replacement from nested folders with numeric filename ordering
 
 Future scope:
 
-- screenshots
 - app previews
 - build selection
 - review attachments
@@ -85,11 +94,12 @@ Future scope:
 - routing coverage files
 - rating reset
 
-Screenshot and preview upload should be added as a separate command/workflow because ASC asset uploads use reservation/upload/commit/reorder APIs.
+App preview upload should be added as a separate command/workflow because ASC video assets have
+additional validation and processing edge cases.
 
 ## Important Implementation Details
 
-The script is dependency-free Node and uses Node built-ins only.
+The scripts are dependency-free Node and use Node built-ins only.
 
 ASC JWT signing must use:
 
@@ -102,7 +112,9 @@ crypto.sign("sha256", Buffer.from(signingInput), {
 
 This matters. A previous Ruby signing attempt returned ASC `401`; the Node `ieee-p1363` signature worked.
 
-The script only talks to App Store Connect. It does not read or create Google Sheets directly. The skill/agent should read Google Sheets through the Google Sheets connector, then write transient desired-state JSON to `/private/tmp`.
+The scripts only talk to App Store Connect and local files. They do not read or create Google Sheets
+directly. The skill/agent should read Google Sheets through the Google Sheets connector, then write
+transient desired-state JSON to `/private/tmp`.
 
 If `ASC_SHEET_ID` is missing or the spreadsheet cannot be found, the skill can create a native Google Sheet first. New sheets should follow the WatchCloud strings format documented in `plugins/asc-marketing-manager/skills/asc-marketing-manager/references/google-sheet-localizations.md`:
 
@@ -155,6 +167,29 @@ node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync
 
 Always run dry-run first. Only apply after the user explicitly asks.
 
+Screenshot dry run:
+
+```zsh
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
+  --dry-run
+```
+
+Screenshot apply:
+
+```zsh
+node plugins/asc-marketing-manager/skills/asc-marketing-manager/scripts/asc-sync-assets.mjs \
+  --env ~/.appstoreconnect/my-app.env \
+  --assets ./AppStoreScreenshots \
+  --version 2.3.0 \
+  --apply
+```
+
+Screenshot apply replaces each targeted ASC screenshot set. Always run dry-run first. Only apply
+after the user explicitly asks.
+
 ## Credential Rules
 
 Never commit or print full credentials.
@@ -173,8 +208,9 @@ ASC_SHEET_NAME=...
 ```
 
 Keep the target App Store version out of shared credential files. Provide it with `--version` or
-`version.versionString`. If the user did not specify the target version in their prompt, ask for it.
-`ASC_PLATFORM` and `ASC_COPYRIGHT` are only needed when creating a missing version.
+`version.versionString`; screenshot sync uses `--version`. If the user did not specify the target
+version in their prompt, ask for it. `ASC_PLATFORM` and `ASC_COPYRIGHT` are only needed when creating
+a missing version.
 
 Recommended permissions:
 
@@ -242,8 +278,13 @@ The script validates:
 - blank fields
 - field character and byte limits
 - support and marketing URL shape
+- screenshot folder locale/display inference
+- screenshot numeric ordering collisions
+- screenshot file extensions and nonempty files
 
-The script normalizes trailing whitespace because ASC strips trailing whitespace on save.
+The metadata script normalizes trailing whitespace because ASC strips trailing whitespace on save.
+The screenshot script uses ASC reservation/upload/commit APIs, reorders uploaded screenshots, and
+polls asset delivery state until processing succeeds or fails.
 
 ## Publishing Direction
 

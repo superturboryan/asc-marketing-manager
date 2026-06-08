@@ -435,7 +435,7 @@ function isEditableAppInfo(appInfo) {
   return EDITABLE_VERSION_STATES.has(state);
 }
 
-async function loadAppVersion(ascRequest, env, versionString, allowMissingVersion) {
+export async function loadAppVersion(ascRequest, env, versionString, allowMissingVersion) {
   if (!versionString) {
     throw new Error('Missing version string. Provide --version <version> or version.versionString in desired JSON.');
   }
